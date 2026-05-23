@@ -165,9 +165,10 @@ input[type=range].valence::-moz-range-thumb {
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <span class="brand">— monitor —</span>
+      <span class="brand" id="brandBtn" style="cursor:pointer;" title="Click to set Sync URL">— monitor —</span>
       <div class="header-right">
         <span class="datestamp" id="todayStamp"></span>
+        <span id="syncIndicator" style="font-size: 11px; margin-left: 10px; font-weight: 700;"></span>
         <button type="button" id="langToggle" class="btn-ghost" style="padding:4px 8px; font-size:11px; margin-left:12px;">EN / 中</button>
       </div>
     </div>
@@ -223,7 +224,7 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="actions">
-    <button type="button" class="btn-primary" onclick="saveDaily()" data-i18n="save_entry">Save entry</button>
+    <button type="button" id="btn_save_daily" class="btn-primary" onclick="saveDaily()" data-i18n="save_entry">Save entry</button>
     <button type="button" class="btn-ghost" onclick="resetDaily()" data-i18n="clear">Clear</button>
   </div>
 </section>
@@ -268,7 +269,7 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="actions">
-    <button type="button" class="btn-primary" onclick="saveAssess()" data-i18n="save_assess">Save assessment</button>
+    <button type="button" id="btn_save_assess" class="btn-primary" onclick="saveAssess()" data-i18n="save_assess">Save assessment</button>
     <button type="button" class="btn-ghost" onclick="resetAssess()" data-i18n="clear">Clear</button>
   </div>
 </section>
@@ -290,7 +291,7 @@ input[type=range].valence::-moz-range-thumb {
     </label>
     <div id="med_quick_fields"></div>
     <div class="actions" style="margin-top:10px;">
-      <button type="button" class="btn-primary" onclick="logIntake()" data-i18n="log_intake">Log intake</button>
+      <button type="button" id="btn_log_intake" class="btn-primary" onclick="logIntake()" data-i18n="log_intake">Log intake</button>
     </div>
   </div>
 
@@ -321,29 +322,122 @@ input[type=range].valence::-moz-range-thumb {
 <script>
 const Store = {
   _key: 'monitor_v1',
+  _collections: ['daily', 'assess', 'meds'],
+  _syncing: false,
   _all() {
     try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
     catch(e){ return {daily:[],assess:[],meds:[]}; }
   },
   _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
+  _stripDirty(record){
+    const copy = Object.assign({}, record);
+    delete copy._dirty;
+    return copy;
+  },
+  countDirty(){
+    const d = this._all();
+    let n = 0;
+    this._collections.forEach(coll=>{
+      d[coll].forEach(r=>{ if(r._dirty) n++; });
+    });
+    return n;
+  },
   put(coll, record){
+    record._dirty = true;
     const d = this._all();
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
     this._commit(d);
+    updateSyncUI();
+    this.syncQueue();
   },
   deleteBySubmission(coll, submission_id){
     const d = this._all();
     d[coll] = d[coll].filter(r => r.submission_id !== submission_id);
     this._commit(d);
+    updateSyncUI();
   },
   getByDate(coll, date){
     const d = this._all();
     return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
   },
   list(coll){ return this._all()[coll]; },
-  everything(){ return this._all(); }
+  everything(){ return this._all(); },
+  exportClean(){
+    const d = this._all();
+    const out = { daily:[], assess:[], meds:[] };
+    this._collections.forEach(coll=>{
+      out[coll] = d[coll].map(r=>this._stripDirty(r));
+    });
+    return out;
+  },
+  async syncQueue(){
+    if(this._syncing) return;
+    const ENDPOINT = localStorage.getItem('monitor_endpoint');
+    if(!ENDPOINT) return;
+    if(!navigator.onLine){ updateSyncUI(); return; }
+    this._syncing = true;
+    updateSyncUI();
+    try {
+      const d = this._all();
+      let changed = false;
+      for(const coll of this._collections){
+        for(const record of d[coll]){
+          if(!record._dirty) continue;
+          const rec = this._stripDirty(record);
+          const res = await fetch(ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ collection: coll, record: rec })
+          });
+          if(res.status === 200){
+            const idx = d[coll].findIndex(r => r.submission_id === record.submission_id);
+            if(idx >= 0){ d[coll][idx]._dirty = false; changed = true; }
+          }
+        }
+      }
+      if(changed) this._commit(d);
+    } catch(e) { /* fail silently — retry later */ }
+    finally {
+      this._syncing = false;
+      updateSyncUI();
+    }
+  }
 };
+
+function syncLabel(key, vars){
+  const L = {
+    synced: { en: '[ Synced ]', zh: '[ 已同步 ]' },
+    syncing: { en: '[ Syncing: {n} pending ]', zh: '[ 同步中：{n} 待傳 ]' },
+    offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' }
+  };
+  let s = (L[key] && (L[key][currentLang] || L[key].en)) || key;
+  if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
+  return s;
+}
+
+function updateSyncUI(){
+  const el = $('#syncIndicator');
+  if(!el) return;
+  const n = Store.countDirty();
+  if(n === 0){
+    el.textContent = syncLabel('synced');
+    el.style.color = 'var(--mid)';
+  } else if(!navigator.onLine){
+    el.textContent = syncLabel('offline', { n });
+    el.style.color = 'var(--neg)';
+  } else {
+    el.textContent = syncLabel('syncing', { n });
+    el.style.color = 'var(--pos)';
+  }
+}
+
+function guardSubmitBtn(btn, fn){
+  if(!btn || btn.disabled) return;
+  btn.disabled = true;
+  fn();
+  setTimeout(()=>{ btn.disabled = false; }, 500);
+}
 
 let currentLang = 'en';
 
@@ -358,7 +452,7 @@ const I18N = {
   bio_placeholder:{en:'one concrete bodily fact, if any',zh:'一項具體的身體事實（若有）'},
   note:{en:'Note',zh:'備註'}, note_hint:{en:'optional',zh:'選填'},
   note_placeholder:{en:'anything worth keeping — a thought, a moment, a line to your future self',zh:'值得留下的任何事 — 念頭、片刻、給未來自己的一句話'},
-  save_entry:{en:'Save entry',zh:'儲存紀錄'}, clear:{en:'Clear',zh:'清除'},
+  save_entry:{en:'Save entry',zh:'儲存紀錄'}, saving:{en:'Saving...',zh:'儲存中…'}, clear:{en:'Clear',zh:'清除'},
   assess_head:{en:'Assessment',zh:'評估'}, assess_sub:{en:'PHQ-9 & GAD-7 · biweekly',zh:'PHQ-9 與 GAD-7 · 雙週'},
   assess_date:{en:'Assessment date',zh:'評估日期'}, over_2_weeks:{en:'over the last 2 weeks',zh:'過去兩週'},
   phq9_total:{en:'PHQ-9 total',zh:'PHQ-9 總分'}, gad7_total:{en:'GAD-7 total',zh:'GAD-7 總分'},
@@ -614,12 +708,14 @@ function loadDaily(date){
 }
 function saveDaily(){
   if(!$('#d_date').value){ toast(t('toast_set_entry_date')); return; }
-  const existing = Store.getByDate('daily', $('#d_date').value);
-  const rec = collectDaily();
-  if(existing) rec.submission_id = existing.submission_id;
-  Store.put('daily', rec);
-  toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
-  updateDailySub();
+  guardSubmitBtn($('#btn_save_daily'), ()=>{
+    const existing = Store.getByDate('daily', $('#d_date').value);
+    const rec = collectDaily();
+    if(existing) rec.submission_id = existing.submission_id;
+    Store.put('daily', rec);
+    toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
+    updateDailySub();
+  });
 }
 function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); }
 $('#d_date').addEventListener('change', ()=>loadDaily($('#d_date').value));
@@ -732,13 +828,15 @@ function loadAssess(date){
 }
 function saveAssess(){
   if(!$('#a_date').value){ toast(t('toast_set_assess_date')); return; }
-  const existing = Store.getByDate('assess', $('#a_date').value);
-  const rec = collectAssess();
-  if(existing) rec.submission_id = existing.submission_id;
-  Store.put('assess', rec);
-  toast(existing ? t('toast_assess_updated') : t('toast_assess_saved'));
-  refreshDueBanner();
-  updateAssessSub();
+  guardSubmitBtn($('#btn_save_assess'), ()=>{
+    const existing = Store.getByDate('assess', $('#a_date').value);
+    const rec = collectAssess();
+    if(existing) rec.submission_id = existing.submission_id;
+    Store.put('assess', rec);
+    toast(existing ? t('toast_assess_updated') : t('toast_assess_saved'));
+    refreshDueBanner();
+    updateAssessSub();
+  });
 }
 function resetAssess(){ clearAssessForm(); $('#a_date').value = todayISO(); updateAssessSub(); }
 $('#a_date').addEventListener('change', ()=>loadAssess($('#a_date').value));
@@ -849,15 +947,17 @@ function logIntake(){
   if(!date){ toast(t('toast_set_log_date')); return; }
   const entry = collectQuickMedEntry();
   if(!entry){ toast(t('toast_fill_field')); return; }
-  const rec = getMedsRecord(date, true);
-  const existing = Store.getByDate('meds', date);
-  if(existing) rec.submission_id = existing.submission_id;
-  rec.entries.push(entry);
-  persistMedsRecord(rec);
-  clearMedQuickFields();
-  renderMedLedger();
-  updateMedsSub();
-  toast(t('toast_intake_logged'));
+  guardSubmitBtn($('#btn_log_intake'), ()=>{
+    const rec = getMedsRecord(date, true);
+    const existing = Store.getByDate('meds', date);
+    if(existing) rec.submission_id = existing.submission_id;
+    rec.entries.push(entry);
+    persistMedsRecord(rec);
+    clearMedQuickFields();
+    renderMedLedger();
+    updateMedsSub();
+    toast(t('toast_intake_logged'));
+  });
 }
 
 function removeMedEntry(idx){
@@ -989,11 +1089,11 @@ $('#logList').addEventListener('click', e=>{
 });
 
 function exportJSON(){
-  const blob=new Blob([JSON.stringify(Store.everything(),null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(Store.exportClean(),null,2)],{type:'application/json'});
   dl(blob, `monitor_export_${todayISO()}.json`);
 }
 function exportCSV(){
-  const all=Store.everything(); const rows=[['collection','entry_date','submission_id','field','value']];
+  const all=Store.exportClean(); const rows=[['collection','entry_date','submission_id','field','value']];
   ['daily','assess','meds'].forEach(coll=>all[coll].forEach(r=>{
     Object.entries(r).forEach(([k,v])=>{
       if(['entry_date','submission_id'].includes(k))return;
@@ -1005,11 +1105,23 @@ function exportCSV(){
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
 
+$('#brandBtn').addEventListener('click', ()=>{
+  const url = prompt('Enter Google Apps Script Sync URL:');
+  if(url) localStorage.setItem('monitor_endpoint', url.trim());
+  updateSyncUI();
+  Store.syncQueue();
+});
+
+window.addEventListener('online', ()=>{ updateSyncUI(); Store.syncQueue(); });
+window.addEventListener('offline', updateSyncUI);
+
 rebuildAssessItems();
 loadDaily(todayISO());
 loadAssess(todayISO());
 loadMeds(todayISO());
 refreshDueBanner();
+updateSyncUI();
+Store.syncQueue();
 renderI18n();
 </script>
 </body>
