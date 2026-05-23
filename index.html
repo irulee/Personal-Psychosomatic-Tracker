@@ -412,6 +412,32 @@ const Store = {
 
     if (updated) this._commit(d);
     if (typeof updateSyncUI === 'function') updateSyncUI();
+  },
+
+  async hydrateFromCloud() {
+    const url = this.endpoint;
+    if (!url || !navigator.onLine) return;
+    try {
+      const res = await fetch(url + '?action=getAll');
+      const textResult = await res.text();
+      console.log('Hydration response:', textResult);
+      const data = JSON.parse(textResult);
+      if (data.daily !== undefined || data.assess !== undefined || data.meds !== undefined) {
+        const normalized = {
+          daily: data.daily || [],
+          assess: data.assess || [],
+          meds: data.meds || []
+        };
+        const current = JSON.stringify(this._all());
+        const incoming = JSON.stringify(normalized);
+        if (current !== incoming) {
+          this._commit(normalized);
+          location.reload();
+        }
+      }
+    } catch (e) {
+      console.error('Hydration failed', e);
+    }
   }
 };
 
@@ -1119,20 +1145,24 @@ $('#brandBtn').addEventListener('click', ()=>{
   const url = prompt('Enter Google Apps Script Sync URL:');
   if(url) localStorage.setItem('monitor_endpoint', url.trim());
   updateSyncUI();
+  Store.hydrateFromCloud();
   Store.syncQueue();
 });
 
-window.addEventListener('online', ()=>{ updateSyncUI(); Store.syncQueue(); });
+window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud(); Store.syncQueue(); });
 window.addEventListener('offline', updateSyncUI);
 
-rebuildAssessItems();
-loadDaily(todayISO());
-loadAssess(todayISO());
-loadMeds(todayISO());
-refreshDueBanner();
-updateSyncUI();
-Store.syncQueue();
-renderI18n();
+(async function appInit(){
+  await Store.hydrateFromCloud();
+  rebuildAssessItems();
+  loadDaily(todayISO());
+  loadAssess(todayISO());
+  loadMeds(todayISO());
+  refreshDueBanner();
+  updateSyncUI();
+  Store.syncQueue();
+  renderI18n();
+})();
 </script>
 </body>
 </html>
