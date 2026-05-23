@@ -34,6 +34,7 @@ header.top {
 }
 .top-row { display: flex; align-items: baseline; justify-content: space-between; }
 .brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+.header-right { display: flex; align-items: baseline; }
 .datestamp { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.05em; }
 
 nav.tabs { display: flex; gap: 0; margin-top: 14px; border: 1.5px solid var(--line-strong); }
@@ -69,7 +70,6 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.55; }
 .row { display: flex; gap: 12px; }
 .row > * { flex: 1; }
 
-/* valence slider */
 .valence-wrap { padding: 6px 2px 2px; }
 .valence-readout { text-align: center; font-family: var(--serif); font-size: 19px; margin-bottom: 14px; min-height: 26px; transition: color 0.15s; }
 .valence-readout .vnum { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
@@ -86,7 +86,6 @@ input[type=range].valence::-moz-range-thumb {
 }
 .valence-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.03em; }
 
-/* chips */
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
   border: 1px solid var(--line-strong); background: var(--field); padding: 6px 11px; font-family: var(--mono);
@@ -97,7 +96,6 @@ input[type=range].valence::-moz-range-thumb {
 .chip-other-input { margin-top: 8px; display: none; }
 .chip-other-input.show { display: block; }
 
-/* assessment */
 .q { border-bottom: 1px solid var(--line); padding: 12px 0; }
 .q:last-child { border-bottom: none; }
 .q-text { font-size: 13px; margin-bottom: 9px; line-height: 1.45; }
@@ -114,7 +112,6 @@ input[type=range].valence::-moz-range-thumb {
 .opts label.sel { background: var(--ink); color: var(--bg); }
 .opts label .ov { display: block; font-size: 14px; font-weight: 700; margin-bottom: 1px; }
 
-.assess-meta { display: flex; gap: 12px; margin-bottom: 4px; }
 .score-line { font-family: var(--serif); font-size: 18px; margin-top: 6px; padding-top: 12px; border-top: 1.5px solid var(--line-strong); display: flex; justify-content: space-between; align-items: baseline; }
 .score-line .sv { font-family: var(--mono); font-weight: 700; }
 .severity { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); }
@@ -122,15 +119,16 @@ input[type=range].valence::-moz-range-thumb {
 .due-banner { background: var(--ink); color: var(--bg); padding: 11px 14px; font-size: 12px; letter-spacing: 0.04em; margin-bottom: 16px; }
 .due-banner.notdue { background: var(--panel); color: var(--ink-soft); border: 1px solid var(--line); }
 
-/* med entries */
-.med-tmpl { border: 1px solid var(--line); background: var(--field); padding: 13px; margin-bottom: 10px; position: relative; }
-.med-tmpl .med-name { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; margin-bottom: 10px; }
-.dose-row { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
-.dose-row:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-.btn-add { background: var(--field); border: 1px solid var(--line-strong); padding: 6px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; cursor: pointer; text-transform: uppercase; }
-.btn-add:hover { background: var(--ink); color: var(--bg); }
-.btn-rm { position: absolute; top: 10px; right: 10px; background: none; border: 1px solid var(--line); width: 22px; height: 22px; cursor: pointer; font-family: var(--mono); font-size: 13px; line-height: 1; color: var(--ink-soft); }
-.btn-rm:hover { border-color: var(--line-strong); background: var(--ink); color: var(--bg); }
+.med-ledger-item {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  border-bottom: 1px solid var(--line); padding: 9px 0; font-size: 12px; line-height: 1.45;
+}
+.med-ledger-item:last-child { border-bottom: none; }
+.btn-rm-ledger {
+  flex-shrink: 0; background: none; border: 1px solid var(--line); width: 22px; height: 22px;
+  cursor: pointer; font-family: var(--mono); font-size: 13px; line-height: 1; color: var(--ink-soft);
+}
+.btn-rm-ledger:hover { border-color: var(--line-strong); background: var(--ink); color: var(--bg); }
 
 .actions { display: flex; gap: 10px; margin-top: 6px; }
 .btn-primary { flex: 1; background: var(--ink); color: var(--bg); border: 1.5px solid var(--line-strong); padding: 13px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; cursor: pointer; }
@@ -141,7 +139,6 @@ input[type=range].valence::-moz-range-thumb {
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: var(--bg); padding: 11px 20px; font-size: 12px; letter-spacing: 0.05em; z-index: 50; transition: transform 0.25s; border: 1.5px solid var(--line-strong); }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
-/* log */
 .log-entry { border: 1px solid var(--line-strong); background: var(--panel); margin-bottom: 10px; }
 .log-entry summary { padding: 11px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; list-style: none; }
 .log-entry summary::-webkit-details-marker { display: none; }
@@ -151,6 +148,12 @@ input[type=range].valence::-moz-range-thumb {
 .log-body dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 12px; margin-top: 10px; }
 .log-body dt { color: var(--mid); }
 .log-body dd { color: var(--ink); }
+.log-edit { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-log-edit {
+  background: var(--field); border: 1px solid var(--line-strong); padding: 5px 10px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+}
+.btn-log-edit:hover { background: var(--ink); color: var(--bg); }
 .empty { color: var(--mid); font-size: 12px; padding: 20px 0; text-align: center; }
 .export-row { display: flex; gap: 10px; margin: 18px 0; }
 
@@ -163,150 +166,159 @@ input[type=range].valence::-moz-range-thumb {
   <div class="wrap">
     <div class="top-row">
       <span class="brand">— monitor —</span>
-      <span class="datestamp" id="todayStamp"></span>
+      <div class="header-right">
+        <span class="datestamp" id="todayStamp"></span>
+        <button type="button" id="langToggle" class="btn-ghost" style="padding:4px 8px; font-size:11px; margin-left:12px;">EN / 中</button>
+      </div>
     </div>
     <nav class="tabs">
-      <button data-seg="daily" class="active">Daily</button>
-      <button data-seg="assess">Assessment</button>
-      <button data-seg="meds">Medication</button>
-      <button data-seg="log">Log</button>
+      <button type="button" data-seg="daily" class="active" data-i18n="tab_daily">Daily</button>
+      <button type="button" data-seg="assess" data-i18n="tab_assess">Assessment</button>
+      <button type="button" data-seg="meds" data-i18n="tab_meds">Medication</button>
+      <button type="button" data-seg="log" data-i18n="tab_log">Log</button>
     </nav>
   </div>
 </header>
 
 <main class="wrap">
 
-<!-- ============ DAILY ============ -->
 <section class="seg active" id="seg-daily">
-  <div class="seg-head">Daily entry</div>
-  <div class="seg-sub" id="dailySub">mood · body · biological fact · note</div>
+  <div class="seg-head" data-i18n="daily_head">Daily entry</div>
+  <div class="seg-sub" id="dailySub" data-i18n="daily_sub">mood · body · biological fact · note</div>
 
   <label class="fld">
-    <span class="lab">Entry date</span>
+    <span class="lab" data-i18n="entry_date">Entry date</span>
     <input type="date" id="d_date">
   </label>
 
   <div class="block">
-    <div class="block-title">Mood <span class="hint">how does this moment feel</span></div>
+    <div class="block-title"><span data-i18n="mood">Mood</span> <span class="hint" data-i18n="mood_hint">how does this moment feel</span></div>
     <div class="valence-wrap">
       <div class="valence-readout" id="valReadout">—<span class="vnum"></span></div>
       <div class="valence-track"></div>
       <input type="range" class="valence" id="d_valence" min="-100" max="100" value="0" step="1">
-      <div class="valence-ends"><span>very unpleasant</span><span>neutral</span><span>very pleasant</span></div>
+      <div class="valence-ends">
+        <span data-i18n="val_very_unpleasant">very unpleasant</span>
+        <span data-i18n="val_neutral">neutral</span>
+        <span data-i18n="val_very_pleasant">very pleasant</span>
+      </div>
     </div>
   </div>
 
   <div class="block">
-    <div class="block-title">Body sensations <span class="hint">select any</span></div>
+    <div class="block-title"><span data-i18n="body_sensations">Body sensations</span> <span class="hint" data-i18n="body_hint">select any</span></div>
     <div class="chips" id="d_body"></div>
-    <input type="text" class="chip-other-input" id="d_body_other" placeholder="other — describe">
-    <input type="text" class="chip-other-input" id="d_body_tension" placeholder="tension — where?">
+    <input type="text" class="chip-other-input" id="d_body_other" data-i18n-placeholder="other_describe" placeholder="other — describe">
+    <input type="text" class="chip-other-input" id="d_body_tension" data-i18n-placeholder="tension_where" placeholder="tension — where?">
   </div>
 
   <div class="block">
-    <div class="block-title">Biological fact <span class="hint">ate / slept / pain / etc.</span></div>
-    <textarea id="d_bio" placeholder="one concrete bodily fact, if any"></textarea>
+    <div class="block-title"><span data-i18n="bio_fact">Biological fact</span> <span class="hint" data-i18n="bio_hint">ate / slept / pain / etc.</span></div>
+    <textarea id="d_bio" data-i18n-placeholder="bio_placeholder" placeholder="one concrete bodily fact, if any"></textarea>
   </div>
 
   <div class="block">
-    <div class="block-title">Note <span class="hint">optional</span></div>
-    <textarea id="d_note" placeholder="anything worth keeping — a thought, a moment, a line to your future self"></textarea>
+    <div class="block-title"><span data-i18n="note">Note</span> <span class="hint" data-i18n="note_hint">optional</span></div>
+    <textarea id="d_note" data-i18n-placeholder="note_placeholder" placeholder="anything worth keeping — a thought, a moment, a line to your future self"></textarea>
   </div>
 
   <div class="actions">
-    <button class="btn-primary" onclick="saveDaily()">Save entry</button>
-    <button class="btn-ghost" onclick="resetDaily()">Clear</button>
+    <button type="button" class="btn-primary" onclick="saveDaily()" data-i18n="save_entry">Save entry</button>
+    <button type="button" class="btn-ghost" onclick="resetDaily()" data-i18n="clear">Clear</button>
   </div>
 </section>
 
-<!-- ============ ASSESSMENT ============ -->
 <section class="seg" id="seg-assess">
-  <div class="seg-head">Assessment</div>
-  <div class="seg-sub">PHQ-9 &amp; GAD-7 · biweekly</div>
+  <div class="seg-head" data-i18n="assess_head">Assessment</div>
+  <div class="seg-sub" id="assessSub" data-i18n="assess_sub">PHQ-9 &amp; GAD-7 · biweekly</div>
 
   <div id="dueBanner"></div>
 
   <label class="fld">
-    <span class="lab">Assessment date</span>
+    <span class="lab" data-i18n="assess_date">Assessment date</span>
     <input type="date" id="a_date">
   </label>
 
   <div class="block">
-    <div class="block-title">PHQ-9 <span class="hint">over the last 2 weeks</span></div>
+    <div class="block-title"><span>PHQ-9</span> <span class="hint" data-i18n="over_2_weeks">over the last 2 weeks</span></div>
     <div id="phq9"></div>
-    <div class="score-line">PHQ-9 total <span class="sv" id="phq9score">0</span></div>
+    <div class="score-line"><span data-i18n="phq9_total">PHQ-9 total</span> <span class="sv" id="phq9score">0</span></div>
     <div class="severity" id="phq9sev"></div>
   </div>
 
   <div class="block">
-    <div class="block-title">GAD-7 <span class="hint">over the last 2 weeks</span></div>
+    <div class="block-title"><span>GAD-7</span> <span class="hint" data-i18n="over_2_weeks">over the last 2 weeks</span></div>
     <div id="gad7"></div>
-    <div class="score-line">GAD-7 total <span class="sv" id="gad7score">0</span></div>
+    <div class="score-line"><span data-i18n="gad7_total">GAD-7 total</span> <span class="sv" id="gad7score">0</span></div>
     <div class="severity" id="gad7sev"></div>
   </div>
 
   <div class="block">
-    <div class="block-title">Functional difficulty <span class="hint">if any problems checked</span></div>
+    <div class="block-title"><span data-i18n="func_diff_head">Functional difficulty</span> <span class="hint" data-i18n="func_diff_hint">if any problems checked</span></div>
     <label class="fld">
-      <span class="lab">How difficult have these made your work, home, or relationships?</span>
+      <span class="lab" data-i18n="func_diff_q">How difficult have these made your work, home, or relationships?</span>
       <select id="a_difficulty">
         <option value="">—</option>
-        <option>Not difficult at all</option>
-        <option>Somewhat difficult</option>
-        <option>Very difficult</option>
-        <option>Extremely difficult</option>
+        <option value="Not difficult at all" data-i18n-opt="diff_not">Not difficult at all</option>
+        <option value="Somewhat difficult" data-i18n-opt="diff_some">Somewhat difficult</option>
+        <option value="Very difficult" data-i18n-opt="diff_very">Very difficult</option>
+        <option value="Extremely difficult" data-i18n-opt="diff_ext">Extremely difficult</option>
       </select>
     </label>
   </div>
 
   <div class="actions">
-    <button class="btn-primary" onclick="saveAssess()">Save assessment</button>
-    <button class="btn-ghost" onclick="resetAssess()">Clear</button>
+    <button type="button" class="btn-primary" onclick="saveAssess()" data-i18n="save_assess">Save assessment</button>
+    <button type="button" class="btn-ghost" onclick="resetAssess()" data-i18n="clear">Clear</button>
   </div>
 </section>
 
-<!-- ============ MEDICATION ============ -->
 <section class="seg" id="seg-meds">
-  <div class="seg-head">Medication</div>
-  <div class="seg-sub">retrospective daily log · type · time · dose · effect</div>
+  <div class="seg-head" data-i18n="meds_head">Medication</div>
+  <div class="seg-sub" id="medsSub" data-i18n="meds_sub">stream ledger · log each intake</div>
 
   <label class="fld">
-    <span class="lab">Log date</span>
+    <span class="lab" data-i18n="log_date">Log date</span>
     <input type="date" id="m_date">
   </label>
 
-  <div id="medContainer"></div>
+  <div class="block">
+    <div class="block-title" data-i18n="quick_entry">Quick entry</div>
+    <label class="fld">
+      <span class="lab" data-i18n="medication">Medication</span>
+      <select id="med_selector"><option value="">—</option></select>
+    </label>
+    <div id="med_quick_fields"></div>
+    <div class="actions" style="margin-top:10px;">
+      <button type="button" class="btn-primary" onclick="logIntake()" data-i18n="log_intake">Log intake</button>
+    </div>
+  </div>
 
-  <div class="actions">
-    <button class="btn-primary" onclick="saveMeds()">Save medication log</button>
-    <button class="btn-ghost" onclick="resetMeds()">Clear</button>
+  <div class="block">
+    <div class="block-title" data-i18n="todays_ledger">Today's ledger</div>
+    <div id="med_ledger"></div>
   </div>
 </section>
 
-<!-- ============ LOG ============ -->
 <section class="seg" id="seg-log">
-  <div class="seg-head">Log</div>
-  <div class="seg-sub">recent entries · newest first</div>
+  <div class="seg-head" data-i18n="log_head">Log</div>
+  <div class="seg-sub" data-i18n="log_sub">recent entries · newest first</div>
   <div class="export-row">
-    <button class="btn-ghost" onclick="exportJSON()">Export JSON</button>
-    <button class="btn-ghost" onclick="exportCSV()">Export CSV</button>
+    <button type="button" class="btn-ghost" onclick="exportJSON()" data-i18n="export_json">Export JSON</button>
+    <button type="button" class="btn-ghost" onclick="exportCSV()" data-i18n="export_csv">Export CSV</button>
   </div>
   <div id="logList"></div>
 </section>
 
-<div class="footnote">
-  Demo build · data stored locally in this browser only (<code>localStorage</code>) · nothing is sent anywhere.
+<div class="footnote" data-i18n="footnote">
+  Demo build · data stored locally in this browser only (localStorage) · nothing is sent anywhere.
   PHQ-9 / GAD-7 item wording &amp; scoring per Spitzer, Williams, Kroenke et al., 1999 (no permission required to reproduce).
-  Storage is routed through <code>Store.*</code> for later swap to a cloud backend — see handoff notes.
+  Storage is routed through Store.* for later swap to a cloud backend — see handoff notes.
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-/* ============================================================
-   STORAGE LAYER  —  swap these four functions for cloud sync.
-   Every read/write in the app goes through Store.*
-   ============================================================ */
 const Store = {
   _key: 'monitor_v1',
   _all() {
@@ -314,14 +326,17 @@ const Store = {
     catch(e){ return {daily:[],assess:[],meds:[]}; }
   },
   _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
-  // upsert by submission_id within a collection ('daily'|'assess'|'meds')
   put(coll, record){
     const d = this._all();
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
     this._commit(d);
   },
-  // get one record for a given entry_date in a collection (or null)
+  deleteBySubmission(coll, submission_id){
+    const d = this._all();
+    d[coll] = d[coll].filter(r => r.submission_id !== submission_id);
+    this._commit(d);
+  },
   getByDate(coll, date){
     const d = this._all();
     return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
@@ -330,8 +345,73 @@ const Store = {
   everything(){ return this._all(); }
 };
 
-/* ---------- constants ---------- */
-const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach discomfort','Shallow breathing','Restlessness','Numbness','Neutral','Other'];
+let currentLang = 'en';
+
+const I18N = {
+  tab_daily:{en:'Daily',zh:'每日'}, tab_assess:{en:'Assessment',zh:'評估'}, tab_meds:{en:'Medication',zh:'用藥'}, tab_log:{en:'Log',zh:'紀錄'},
+  daily_head:{en:'Daily entry',zh:'每日紀錄'}, daily_sub:{en:'mood · body · biological fact · note',zh:'情緒 · 身體 · 生理事實 · 備註'},
+  entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
+  val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
+  body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
+  other_describe:{en:'other — describe',zh:'其他 — 描述'}, tension_where:{en:'tension — where?',zh:'緊繃 — 哪裡？'},
+  bio_fact:{en:'Biological fact',zh:'生理事實'}, bio_hint:{en:'ate / slept / pain / etc.',zh:'飲食 / 睡眠 / 疼痛等'},
+  bio_placeholder:{en:'one concrete bodily fact, if any',zh:'一項具體的身體事實（若有）'},
+  note:{en:'Note',zh:'備註'}, note_hint:{en:'optional',zh:'選填'},
+  note_placeholder:{en:'anything worth keeping — a thought, a moment, a line to your future self',zh:'值得留下的任何事 — 念頭、片刻、給未來自己的一句話'},
+  save_entry:{en:'Save entry',zh:'儲存紀錄'}, clear:{en:'Clear',zh:'清除'},
+  assess_head:{en:'Assessment',zh:'評估'}, assess_sub:{en:'PHQ-9 & GAD-7 · biweekly',zh:'PHQ-9 與 GAD-7 · 雙週'},
+  assess_date:{en:'Assessment date',zh:'評估日期'}, over_2_weeks:{en:'over the last 2 weeks',zh:'過去兩週'},
+  phq9_total:{en:'PHQ-9 total',zh:'PHQ-9 總分'}, gad7_total:{en:'GAD-7 total',zh:'GAD-7 總分'},
+  func_diff_head:{en:'Functional difficulty',zh:'功能困難'}, func_diff_hint:{en:'if any problems checked',zh:'若有勾選任何問題'},
+  func_diff_q:{en:'How difficult have these made your work, home, or relationships?',zh:'這些問題對您的工作、家庭或人際關係造成多大困難？'},
+  diff_not:{en:'Not difficult at all',zh:'完全沒有困難'}, diff_some:{en:'Somewhat difficult',zh:'有些困難'},
+  diff_very:{en:'Very difficult',zh:'非常困難'}, diff_ext:{en:'Extremely difficult',zh:'極度困難'},
+  save_assess:{en:'Save assessment',zh:'儲存評估'},
+  meds_head:{en:'Medication',zh:'用藥'}, meds_sub:{en:'stream ledger · log each intake',zh:'流水帳 · 逐筆記錄'},
+  log_date:{en:'Log date',zh:'紀錄日期'}, quick_entry:{en:'Quick entry',zh:'快速輸入'}, medication:{en:'Medication',zh:'藥物'},
+  log_intake:{en:'Log intake',zh:'記錄服用'}, todays_ledger:{en:"Today's ledger",zh:'今日流水'},
+  log_head:{en:'Log',zh:'紀錄'}, log_sub:{en:'recent entries · newest first',zh:'近期紀錄 · 新到舊'},
+  export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'},
+  field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
+  field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
+  field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
+  effect_ph:{en:'e.g. palpitations / none',zh:'例：心悸 / 無'}, amount_ph:{en:'e.g. a few puffs',zh:'例：幾口'},
+  yes:{en:'Yes',zh:'是'}, no:{en:'No',zh:'否'},
+  med_wellbutrin:{en:'Wellbutrin XL 300mg',zh:'Wellbutrin XL 300mg'}, med_zolon:{en:'Zolon 7.5mg (zopiclone)',zh:'Zolon 7.5mg (zopiclone)'},
+  med_ritalin:{en:'Ritalin 10mg',zh:'Ritalin 10mg'}, med_recreational:{en:'Recreational / other',zh:'娛樂性 / 其他'},
+  ledger_empty:{en:'No intakes logged for this date.',zh:'此日期尚無服用紀錄。'},
+  toast_set_entry_date:{en:'Set an entry date',zh:'請設定紀錄日期'}, toast_set_assess_date:{en:'Set an assessment date',zh:'請設定評估日期'},
+  toast_set_log_date:{en:'Set a log date',zh:'請設定紀錄日期'}, toast_fill_field:{en:'Fill at least one field',zh:'請至少填寫一項'},
+  toast_daily_saved:{en:'Daily entry saved',zh:'每日紀錄已儲存'}, toast_daily_updated:{en:'Daily entry updated',zh:'每日紀錄已更新'},
+  toast_assess_saved:{en:'Assessment saved',zh:'評估已儲存'}, toast_assess_updated:{en:'Assessment updated',zh:'評估已更新'},
+  toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
+  daily_sub_onfile:{en:'entry on file for {date} — save will update',zh:'{date} 已有紀錄 — 儲存將更新'},
+  assess_sub_onfile:{en:'assessment on file for {date} — save will update',zh:'{date} 已有評估 — 儲存將更新'},
+  meds_sub_onfile:{en:'{n} intake(s) on file for {date}',zh:'{date} 已有 {n} 筆服用紀錄'},
+  log_mood:{en:'mood',zh:'情緒'}, log_body:{en:'body',zh:'身體'}, log_bio:{en:'bio fact',zh:'生理'}, log_note:{en:'note',zh:'備註'},
+  log_difficulty:{en:'difficulty',zh:'困難度'}, log_meds:{en:'meds',zh:'用藥'}, log_incomplete:{en:'incomplete',zh:'未完成'},
+  log_backfilled:{en:'backfilled',zh:'補登'}, log_valence:{en:'valence',zh:'效價'},
+  log_med_entries:{en:'med entries',zh:'用藥筆數'}, log_edit_daily:{en:'edit daily',zh:'編輯每日'}, log_edit_assess:{en:'edit assessment',zh:'編輯評估'},
+  log_edit_meds:{en:'edit meds',zh:'編輯用藥'}, log_empty:{en:'No entries yet.',zh:'尚無紀錄。'},
+  due_none:{en:'No assessment on record yet — the first one establishes your baseline.',zh:'尚無評估紀錄 — 第一次將建立基準。'},
+  due_reached:{en:'Due — last assessment {days} days ago ({date}). Biweekly target reached.',zh:'到期 — 上次評估 {days} 天前（{date}）。已達雙週目標。'},
+  due_countdown:{en:'Last assessment {days} day(s) ago ({date}). Next due in {left} day(s).',zh:'上次評估 {days} 天前（{date}）。{left} 天後到期。'},
+  sev_incomplete:{en:'incomplete',zh:'未完成'},
+  food_label:{en:'food',zh:'食物'},
+  footnote:{en:'Demo build · data stored locally in this browser only (localStorage) · nothing is sent anywhere. PHQ-9 / GAD-7 item wording & scoring per Spitzer, Williams, Kroenke et al., 1999 (no permission required to reproduce). Storage is routed through Store.* for later swap to a cloud backend — see handoff notes.',zh:'示範版本 · 資料僅存於此瀏覽器本機（localStorage）· 不會傳送至任何地方。PHQ-9 / GAD-7 題目與計分依 Spitzer, Williams, Kroenke 等，1999。儲存經 Store.* 路由，可日後換為雲端後端。'},
+  'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
+  'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
+  'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
+  'Numbness':{en:'Numbness',zh:'麻木'}, 'Neutral':{en:'Neutral',zh:'中性'}, 'Other':{en:'Other',zh:'其他'},
+  'Very unpleasant':{en:'Very unpleasant',zh:'非常不愉快'}, 'Unpleasant':{en:'Unpleasant',zh:'不愉快'},
+  'Neutral_mood':{en:'Neutral',zh:'中性'}, 'Pleasant':{en:'Pleasant',zh:'愉快'}, 'Very pleasant':{en:'Very pleasant',zh:'非常愉快'},
+  'THC (vape)':{en:'THC (vape)',zh:'THC（電子煙）'}, 'THC (flower)':{en:'THC (flower)',zh:'THC（花）'},
+  'THC (edible)':{en:'THC (edible)',zh:'THC（食用）'}, 'Alcohol':{en:'Alcohol',zh:'酒精'},
+  'MDMA / ecstasy':{en:'MDMA / ecstasy',zh:'MDMA / 搖頭丸'}, 'Ketamine':{en:'Ketamine',zh:'Ketamine'},
+  'minimal (0–4)':{en:'minimal (0–4)',zh:'極輕微 (0–4)'}, 'mild (5–9)':{en:'mild (5–9)',zh:'輕度 (5–9)'},
+  'moderate (10–14)':{en:'moderate (10–14)',zh:'中度 (10–14)'}, 'moderately severe (15–19)':{en:'moderately severe (15–19)',zh:'中重度 (15–19)'},
+  'severe (20–27)':{en:'severe (20–27)',zh:'重度 (20–27)'}, 'severe (15–21)':{en:'severe (15–21)',zh:'重度 (15–21)'}
+};
 
 const PHQ9_ITEMS = [
   "Little interest or pleasure in doing things.",
@@ -339,23 +419,45 @@ const PHQ9_ITEMS = [
   "Trouble falling or staying asleep, or sleeping too much.",
   "Feeling tired or having little energy.",
   "Poor appetite or overeating.",
-  "Feeling bad about yourself \u2013 or that you are a failure or have let yourself or your family down.",
+  "Feeling bad about yourself – or that you are a failure or have let yourself or your family down.",
   "Trouble concentrating on things, such as reading the newspaper or watching television.",
-  "Moving or speaking so slowly that other people could have noticed. Or the opposite \u2013 being so fidgety or restless that you have been moving around a lot more than usual.",
+  "Moving or speaking so slowly that other people could have noticed. Or the opposite – being so fidgety or restless that you have been moving around a lot more than usual.",
   "Thoughts that you would be better off dead, or of hurting yourself in some way."
+];
+const PHQ9_ITEMS_ZH = [
+  "做事時提不起勁或沒有樂趣",
+  "感到心情低落、沮喪或絕望",
+  "入睡困難、睡不安穩或睡眠過多",
+  "感覺疲倦或沒有活力",
+  "食慾不振或吃太多",
+  "覺得自己很糟－或覺得自己很失敗、或讓自己或家人失望",
+  "對事物專注有困難，例如閱讀報紙或看電視時",
+  "動作或說話速度緩慢到別人已經察覺，或正好相反－煩躁或坐立不安、動來動去的狀況更勝於平常",
+  "有不如死掉或用某種方式傷害自己的念頭"
 ];
 const GAD7_ITEMS = [
   "Feeling nervous, anxious, or on edge.",
   "Not being able to stop or control worrying.",
   "Worrying too much about different things.",
   "Trouble relaxing.",
-  "Being so restless that it\u2019s hard to sit still.",
+  "Being so restless that it's hard to sit still.",
   "Becoming easily annoyed or irritable.",
   "Feeling afraid as if something awful might happen."
 ];
+const GAD7_ITEMS_ZH = [
+  "感到緊張、不安或煩躁",
+  "無法停止或者控制憂慮",
+  "過分憂慮不同的事情",
+  "難以放鬆",
+  "「心緒不寧以至坐立不安",
+  "容易心煩或易怒",
+  "感到害怕,就想要發生可怕的事情"
+];
 const OPTS = ["Not at all","Several days","More than half the days","Nearly every day"];
+const OPTS_ZH = ["完全沒有", "幾天", "一半以上的天數", "幾乎每天"];
 
-// Medication templates: pattern-grouped per user's prescription profile.
+const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach discomfort','Shallow breathing','Restlessness','Numbness','Neutral','Other'];
+
 const MED_TEMPLATES = [
   { id:'wellbutrin', name:'Wellbutrin XL 300mg', pattern:'daily', fields:['time','withFood'], multi:false },
   { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','time'], multi:false, mgPerTab:7.5 },
@@ -364,54 +466,95 @@ const MED_TEMPLATES = [
     options:['THC (vape)','THC (flower)','THC (edible)','Alcohol','MDMA / ecstasy','Ketamine','Other'] }
 ];
 
-/* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+
+function t(key, vars){
+  const entry = I18N[key];
+  let s = entry ? (entry[currentLang] || entry.en) : key;
+  if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
+  return s;
+}
+const DIFF_VAL_KEYS = {
+  'Not difficult at all': 'diff_not', 'Somewhat difficult': 'diff_some',
+  'Very difficult': 'diff_very', 'Extremely difficult': 'diff_ext'
+};
+function tStored(val){ return val && DIFF_VAL_KEYS[val] ? t(DIFF_VAL_KEYS[val]) : val; }
+
+function todayISO(){
+  const d = new Date();
+  if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function nowStamp(){ return new Date().toISOString(); }
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
+function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
-/* ---------- tabs ---------- */
-$$('nav.tabs button').forEach(b=>{
-  b.onclick=()=>{
-    $$('nav.tabs button').forEach(x=>x.classList.remove('active'));
-    $$('.seg').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    $('#seg-'+b.dataset.seg).classList.add('active');
-    if(b.dataset.seg==='log') renderLog();
-    if(b.dataset.seg==='assess') refreshDueBanner();
-  };
-});
+function renderI18n(){
+  $$('[data-i18n]').forEach(el=>{
+    if(el.id==='dailySub'||el.id==='assessSub'||el.id==='medsSub'||el.id==='dueBanner') return;
+    el.textContent = t(el.dataset.i18n);
+  });
+  $$('[data-i18n-placeholder]').forEach(el=>{
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  $$('option[data-i18n-opt]').forEach(opt=>{ opt.textContent = t(opt.dataset.i18nOpt); });
+  $$('#d_body .chip').forEach(c=>{ c.textContent = t(c.dataset.val); });
+  rebuildAssessItems();
+  initMedSelector();
+  const sel = $('#med_selector').value;
+  if(sel) renderMedQuickFields();
+  updateValence();
+  updateDailySub();
+  updateAssessSub();
+  updateMedsSub();
+  refreshDueBanner();
+  renderMedLedger();
+  if($('#seg-log').classList.contains('active')) renderLog();
+}
 
-/* ---------- date init ---------- */
-$('#todayStamp').textContent = fmtDate(todayISO());
+$('#langToggle').onclick = ()=>{
+  currentLang = currentLang === 'en' ? 'zh' : 'en';
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-Hant' : 'en';
+  renderI18n();
+};
+
+function switchSeg(seg){
+  $$('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.seg===seg));
+  $$('.seg').forEach(x=>x.classList.remove('active'));
+  $('#seg-'+seg).classList.add('active');
+  if(seg==='log') renderLog();
+  if(seg==='assess') refreshDueBanner();
+  if(seg==='meds') renderMedLedger();
+}
+$$('nav.tabs button').forEach(b=>{ b.onclick=()=>switchSeg(b.dataset.seg); });
+
+function updateTodayStamp(){ $('#todayStamp').textContent = fmtDate(todayISO()); }
+updateTodayStamp();
 ['#d_date','#a_date','#m_date'].forEach(id=>{ $(id).value = todayISO(); });
 
-/* ---------- DAILY: valence ---------- */
 const VAL_WORDS = [
-  {max:-60,w:'Very unpleasant'},{max:-20,w:'Unpleasant'},{max:20,w:'Neutral'},
+  {max:-60,w:'Very unpleasant'},{max:-20,w:'Unpleasant'},{max:20,w:'Neutral_mood'},
   {max:60,w:'Pleasant'},{max:101,w:'Very pleasant'}
 ];
-function valWord(v){ for(const s of VAL_WORDS){ if(v<s.max) return s.w; } return 'Neutral'; }
-function valColor(v){
-  // -100 -> neg(blue), 0 -> mid, +100 -> pos(orange)
-  if(v<0){ return `var(--neg)`; } if(v>0){ return `var(--pos)`; } return `var(--ink-soft)`;
-}
+function valWord(v){ for(const s of VAL_WORDS){ if(v<s.max) return s.w; } return 'Neutral_mood'; }
+function valColor(v){ if(v<0) return 'var(--neg)'; if(v>0) return 'var(--pos)'; return 'var(--ink-soft)'; }
 const valSlider = $('#d_valence');
 function updateValence(){
   const v = +valSlider.value;
   const r = $('#valReadout');
-  r.innerHTML = `${valWord(v)} <span class="vnum">(${(v/100).toFixed(2)})</span>`;
+  r.innerHTML = `${t(valWord(v))} <span class="vnum">(${(v/100).toFixed(2)})</span>`;
   r.style.color = valColor(v);
 }
 valSlider.addEventListener('input', updateValence);
-updateValence();
 
-/* ---------- DAILY: body chips ---------- */
 const bodyWrap = $('#d_body');
 BODY_SENSATIONS.forEach(s=>{
-  const c=document.createElement('div'); c.className='chip'; c.textContent=s; c.dataset.val=s;
+  const c=document.createElement('div'); c.className='chip'; c.textContent=t(s); c.dataset.val=s;
   c.onclick=()=>{
     c.classList.toggle('on');
     if(s==='Other') $('#d_body_other').classList.toggle('show', c.classList.contains('on'));
@@ -434,46 +577,88 @@ function collectDaily(){
     note: $('#d_note').value.trim()
   };
 }
-function saveDaily(){
-  if(!$('#d_date').value){ toast('Set an entry date'); return; }
-  const existing = Store.getByDate('daily', $('#d_date').value);
-  const rec = collectDaily();
-  if(existing) rec.submission_id = existing.submission_id; // upsert same day
-  Store.put('daily', rec);
-  toast(existing ? 'Daily entry updated' : 'Daily entry saved');
+function updateDailySub(){
+  const date = $('#d_date').value;
+  const ex = date && Store.getByDate('daily', date);
+  $('#dailySub').textContent = ex ? t('daily_sub_onfile', {date: fmtDate(date)}) : t('daily_sub');
 }
-function resetDaily(){
+function clearDailyForm(){
   valSlider.value=0; updateValence();
   $$('#d_body .chip.on').forEach(c=>c.classList.remove('on'));
   $('#d_body_other').classList.remove('show'); $('#d_body_tension').classList.remove('show');
   $('#d_body_other').value=''; $('#d_body_tension').value='';
-  $('#d_bio').value=''; $('#d_note').value=''; $('#d_date').value=todayISO();
+  $('#d_bio').value=''; $('#d_note').value='';
 }
+function loadDaily(date){
+  if(!date) return;
+  $('#d_date').value = date;
+  clearDailyForm();
+  const rec = Store.getByDate('daily', date);
+  if(rec){
+    valSlider.value = Math.round((rec.valence ?? 0) * 100);
+    updateValence();
+    (rec.body_sensations || []).forEach(s=>{
+      const chip = $$(`#d_body .chip`).find(c=>c.dataset.val===s);
+      if(chip){
+        chip.classList.add('on');
+        if(s==='Other') $('#d_body_other').classList.add('show');
+        if(s==='Tension') $('#d_body_tension').classList.add('show');
+      }
+    });
+    $('#d_body_tension').value = rec.body_tension_where || '';
+    $('#d_body_other').value = rec.body_other || '';
+    $('#d_bio').value = rec.biological_fact || '';
+    $('#d_note').value = rec.note || '';
+  }
+  updateDailySub();
+}
+function saveDaily(){
+  if(!$('#d_date').value){ toast(t('toast_set_entry_date')); return; }
+  const existing = Store.getByDate('daily', $('#d_date').value);
+  const rec = collectDaily();
+  if(existing) rec.submission_id = existing.submission_id;
+  Store.put('daily', rec);
+  toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
+  updateDailySub();
+}
+function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); }
+$('#d_date').addEventListener('change', ()=>loadDaily($('#d_date').value));
 
-/* ---------- ASSESSMENT: build items ---------- */
-function buildAssessItems(containerId, items, prefix){
+function getAssessItemText(itemsEn, itemsZh, i){
+  return currentLang === 'zh' ? itemsZh[i] : itemsEn[i];
+}
+function getOptLabel(i){ return currentLang === 'zh' ? OPTS_ZH[i] : OPTS[i]; }
+
+function buildAssessItems(containerId, itemsEn, itemsZh, prefix){
   const wrap = $(containerId);
-  items.forEach((txt,i)=>{
+  wrap.innerHTML = '';
+  itemsEn.forEach((_,i)=>{
+    const txt = getAssessItemText(itemsEn, itemsZh, i);
     const q=document.createElement('div'); q.className='q';
-    const opts = OPTS.map((o,oi)=>`
+    const opts = OPTS.map((_,oi)=>`
       <label data-q="${prefix}${i}" data-v="${oi}">
         <input type="radio" name="${prefix}${i}" value="${oi}">
-        <span class="ov">${oi}</span>${o}
+        <span class="ov">${oi}</span>${getOptLabel(oi)}
       </label>`).join('');
     q.innerHTML = `<div class="q-text"><span class="qn">${i+1}.</span>${txt}</div><div class="opts">${opts}</div>`;
     wrap.appendChild(q);
   });
-  wrap.addEventListener('change', e=>{
+  wrap.onchange = e=>{
     if(e.target.name && e.target.name.startsWith(prefix)){
-      // visual select state
       $$(`.opts label[data-q="${e.target.name}"]`).forEach(l=>l.classList.remove('sel'));
       e.target.closest('label').classList.add('sel');
       computeScores();
     }
-  });
+  };
 }
-buildAssessItems('#phq9', PHQ9_ITEMS, 'p');
-buildAssessItems('#gad7', GAD7_ITEMS, 'g');
+function rebuildAssessItems(){
+  const pState = getScores('p',9), gState = getScores('g',7);
+  buildAssessItems('#phq9', PHQ9_ITEMS, PHQ9_ITEMS_ZH, 'p');
+  buildAssessItems('#gad7', GAD7_ITEMS, GAD7_ITEMS_ZH, 'g');
+  setAssessItems('p', pState.arr, 9);
+  setAssessItems('g', gState.arr, 7);
+  computeScores();
+}
 
 function getScores(prefix, n){
   let sum=0, answered=0, arr=[];
@@ -485,13 +670,20 @@ function getScores(prefix, n){
   }
   return {sum, answered, complete: answered===n, arr};
 }
-function phqSeverity(s){ if(s<=4)return'minimal (0\u20134)'; if(s<=9)return'mild (5\u20139)'; if(s<=14)return'moderate (10\u201314)'; if(s<=19)return'moderately severe (15\u201319)'; return'severe (20\u201327)'; }
-function gadSeverity(s){ if(s<=4)return'minimal (0\u20134)'; if(s<=9)return'mild (5\u20139)'; if(s<=14)return'moderate (10\u201314)'; return'severe (15\u201321)'; }
+function phqSeverity(s){
+  if(s<=4) return 'minimal (0–4)'; if(s<=9) return 'mild (5–9)'; if(s<=14) return 'moderate (10–14)';
+  if(s<=19) return 'moderately severe (15–19)'; return 'severe (20–27)';
+}
+function gadSeverity(s){
+  if(s<=4) return 'minimal (0–4)'; if(s<=9) return 'mild (5–9)'; if(s<=14) return 'moderate (10–14)';
+  return 'severe (15–21)';
+}
 function computeScores(){
   const p=getScores('p',9), g=getScores('g',7);
   $('#phq9score').textContent=p.sum; $('#gad7score').textContent=g.sum;
-  $('#phq9sev').textContent = p.answered? phqSeverity(p.sum) + (p.complete?'':' \u00b7 incomplete') : '';
-  $('#gad7sev').textContent = g.answered? gadSeverity(g.sum) + (g.complete?'':' \u00b7 incomplete') : '';
+  const inc = ' · ' + t('sev_incomplete');
+  $('#phq9sev').textContent = p.answered ? t(phqSeverity(p.sum)) + (p.complete?'':inc) : '';
+  $('#gad7sev').textContent = g.answered ? t(gadSeverity(g.sum)) + (g.complete?'':inc) : '';
 }
 function collectAssess(){
   const p=getScores('p',9), g=getScores('g',7);
@@ -503,142 +695,299 @@ function collectAssess(){
     functional_difficulty: $('#a_difficulty').value
   };
 }
-function saveAssess(){
-  if(!$('#a_date').value){ toast('Set an assessment date'); return; }
-  Store.put('assess', collectAssess());
-  toast('Assessment saved'); refreshDueBanner();
+function updateAssessSub(){
+  const date = $('#a_date').value;
+  const ex = date && Store.getByDate('assess', date);
+  $('#assessSub').textContent = ex ? t('assess_sub_onfile', {date: fmtDate(date)}) : t('assess_sub');
 }
-function resetAssess(){
+function clearAssessForm(){
   $$('#seg-assess input[type=radio]').forEach(r=>r.checked=false);
   $$('#seg-assess .opts label').forEach(l=>l.classList.remove('sel'));
-  $('#a_difficulty').value=''; $('#a_date').value=todayISO(); computeScores();
+  $('#a_difficulty').value='';
+  computeScores();
 }
+function setAssessItems(prefix, items, n){
+  for(let i=0;i<n;i++){
+    const v = items[i];
+    if(v===null || v===undefined) continue;
+    const radio = document.querySelector(`input[name="${prefix}${i}"][value="${v}"]`);
+    if(!radio) continue;
+    radio.checked = true;
+    $$(`.opts label[data-q="${prefix}${i}"]`).forEach(l=>l.classList.remove('sel'));
+    radio.closest('label').classList.add('sel');
+  }
+}
+function loadAssess(date){
+  if(!date) return;
+  $('#a_date').value = date;
+  clearAssessForm();
+  const rec = Store.getByDate('assess', date);
+  if(rec){
+    setAssessItems('p', rec.phq9_items, 9);
+    setAssessItems('g', rec.gad7_items, 7);
+    $('#a_difficulty').value = rec.functional_difficulty || '';
+    computeScores();
+  }
+  updateAssessSub();
+}
+function saveAssess(){
+  if(!$('#a_date').value){ toast(t('toast_set_assess_date')); return; }
+  const existing = Store.getByDate('assess', $('#a_date').value);
+  const rec = collectAssess();
+  if(existing) rec.submission_id = existing.submission_id;
+  Store.put('assess', rec);
+  toast(existing ? t('toast_assess_updated') : t('toast_assess_saved'));
+  refreshDueBanner();
+  updateAssessSub();
+}
+function resetAssess(){ clearAssessForm(); $('#a_date').value = todayISO(); updateAssessSub(); }
+$('#a_date').addEventListener('change', ()=>loadAssess($('#a_date').value));
+
 function refreshDueBanner(){
-  const all = Store.list('assess').slice().sort((a,b)=>b.entry_date.localeCompare(a.entry_date));
+  const byDate = {};
+  Store.list('assess').forEach(r=>{
+    if(!byDate[r.entry_date] || r.submission_id > byDate[r.entry_date].submission_id)
+      byDate[r.entry_date] = r;
+  });
+  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   const banner=$('#dueBanner');
-  if(!all.length){ banner.className='due-banner'; banner.textContent='No assessment on record yet \u2014 the first one establishes your baseline.'; return; }
-  const last = all[0].entry_date;
+  if(!dates.length){
+    banner.className='due-banner';
+    banner.textContent=t('due_none');
+    return;
+  }
+  const last = dates[0];
   const days = Math.floor((new Date(todayISO()) - new Date(last)) / 86400000);
-  if(days>=14){ banner.className='due-banner'; banner.textContent=`Due \u2014 last assessment ${days} days ago (${fmtDate(last)}). Biweekly target reached.`; }
-  else { banner.className='due-banner notdue'; banner.textContent=`Last assessment ${days} day${days===1?'':'s'} ago (${fmtDate(last)}). Next due in ${14-days} day${14-days===1?'':'s'}.`; }
+  if(days>=14){
+    banner.className='due-banner';
+    banner.textContent=t('due_reached',{days,date:fmtDate(last)});
+  } else {
+    banner.className='due-banner notdue';
+    banner.textContent=t('due_countdown',{days,date:fmtDate(last),left:14-days});
+  }
 }
 
-/* ---------- MEDICATION ---------- */
-function fieldHTML(med, f, idx, ridx){
+function fieldHTML(med, f, ridx){
   const id = `m_${med.id}_${ridx}_${f}`;
+  const tabLabel = med.mgPerTab && f==='tablets' ? ` (${med.mgPerTab}mg)` : '';
   switch(f){
-    case 'time': return `<label class="fld"><span class="lab">Time</span><input type="time" id="${id}"></label>`;
-    case 'tablets': return `<label class="fld"><span class="lab">Tablets${med.mgPerTab?` (\u00d7${med.mgPerTab}mg)`:''}</span><input type="number" step="0.5" min="0" id="${id}"></label>`;
-    case 'withFood': return `<label class="fld"><span class="lab">With food</span><select id="${id}"><option value="">\u2014</option><option>Yes</option><option>No</option></select></label>`;
-    case 'effect': return `<label class="fld"><span class="lab">Follow-up body effect</span><input type="text" id="${id}" placeholder="e.g. palpitations / none"></label>`;
-    case 'substance': return `<label class="fld"><span class="lab">Substance</span><select id="${id}">${['<option value="">\u2014</option>'].concat((med.options||[]).map(o=>`<option>${o}</option>`)).join('')}</select></label>`;
-    case 'amount': return `<label class="fld"><span class="lab">Amount (rough)</span><input type="text" id="${id}" placeholder="e.g. a few puffs"></label>`;
-    case 'notes': return `<label class="fld"><span class="lab">Notes</span><input type="text" id="${id}"></label>`;
+    case 'time': return `<label class="fld"><span class="lab">${t('field_time')}</span><input type="time" id="${id}"></label>`;
+    case 'tablets': return `<label class="fld"><span class="lab">${t('field_tablets')}${tabLabel}</span><input type="number" step="0.5" min="0" id="${id}"></label>`;
+    case 'withFood': return `<label class="fld"><span class="lab">${t('field_with_food')}</span><select id="${id}"><option value="">—</option><option value="Yes">${t('yes')}</option><option value="No">${t('no')}</option></select></label>`;
+    case 'effect': return `<label class="fld"><span class="lab">${t('field_effect')}</span><input type="text" id="${id}" placeholder="${esc(t('effect_ph'))}"></label>`;
+    case 'substance': return `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${(med.options||[]).map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`;
+    case 'amount': return `<label class="fld"><span class="lab">${t('field_amount')}</span><input type="text" id="${id}" placeholder="${esc(t('amount_ph'))}"></label>`;
+    case 'notes': return `<label class="fld"><span class="lab">${t('field_notes')}</span><input type="text" id="${id}"></label>`;
     default: return '';
   }
 }
-function doseRowHTML(med, ridx){
-  const inner = med.fields.map(f=>fieldHTML(med,f,0,ridx)).join('');
-  const rm = med.multi ? `<button class="btn-rm" onclick="this.closest('.dose-row').remove()">\u00d7</button>` : '';
-  // pair fields two-per-row where sensible
-  return `<div class="dose-row" data-med="${med.id}" data-ridx="${ridx}">${rm}${inner}</div>`;
-}
-function renderMeds(){
-  const c=$('#medContainer'); c.innerHTML='';
-  MED_TEMPLATES.forEach(med=>{
-    const block=document.createElement('div'); block.className='med-tmpl'; block.dataset.med=med.id;
-    block.innerHTML = `<div class="med-name">${med.name} <span style="color:var(--mid);font-weight:400;text-transform:none;letter-spacing:0">\u00b7 ${med.pattern}</span></div>
-      <div class="dose-host">${doseRowHTML(med,0)}</div>
-      ${med.multi?`<button class="btn-add" onclick="addDose('${med.id}')">+ add dose</button>`:''}`;
-    c.appendChild(block);
-  });
-}
-let doseCounters={};
-function addDose(medId){
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
-  doseCounters[medId]=(doseCounters[medId]||0)+1;
-  const host = document.querySelector(`.med-tmpl[data-med="${medId}"] .dose-host`);
-  const div=document.createElement('div'); div.innerHTML=doseRowHTML(med, doseCounters[medId]); host.appendChild(div.firstChild);
-}
-function collectMeds(){
-  const entries=[];
-  MED_TEMPLATES.forEach(med=>{
-    $$(`.dose-row[data-med="${med.id}"]`).forEach(row=>{
-      const ridx=row.dataset.ridx; const obj={medication:med.id, med_name:med.name};
-      let hasData=false;
-      med.fields.forEach(f=>{
-        const el=document.getElementById(`m_${med.id}_${ridx}_${f}`);
-        if(el && el.value!==''){ obj[f]=el.value; hasData=true; }
-      });
-      if(med.mgPerTab && obj.tablets) obj.mg = (+obj.tablets)*med.mgPerTab;
-      if(hasData) entries.push(obj);
-    });
-  });
-  return { submission_id: nowStamp(), entry_date: $('#m_date').value, backfilled: $('#m_date').value < todayISO(), entries };
-}
-function saveMeds(){
-  if(!$('#m_date').value){ toast('Set a log date'); return; }
-  const existing = Store.getByDate('meds', $('#m_date').value);
-  const rec = collectMeds();
-  if(existing) rec.submission_id = existing.submission_id;
-  Store.put('meds', rec);
-  toast(existing?'Medication log updated':'Medication log saved');
-}
-function resetMeds(){ doseCounters={}; renderMeds(); $('#m_date').value=todayISO(); }
-renderMeds();
 
-/* ---------- LOG ---------- */
+function initMedSelector(){
+  const sel = $('#med_selector');
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">—</option>` + MED_TEMPLATES.map(m=>
+    `<option value="${m.id}">${esc(t('med_'+m.id))}</option>`
+  ).join('');
+  if(cur && MED_TEMPLATES.some(m=>m.id===cur)) sel.value = cur;
+}
+
+function renderMedQuickFields(){
+  const medId = $('#med_selector').value;
+  const host = $('#med_quick_fields');
+  host.innerHTML = '';
+  if(!medId) return;
+  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  host.innerHTML = med.fields.map(f=>fieldHTML(med, f, 'quick')).join('');
+}
+
+function clearMedQuickFields(){
+  const medId = $('#med_selector').value;
+  if(!medId) return;
+  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  med.fields.forEach(f=>{
+    const el = document.getElementById(`m_${med.id}_quick_${f}`);
+    if(el) el.value = '';
+  });
+}
+
+function collectQuickMedEntry(){
+  const medId = $('#med_selector').value;
+  if(!medId) return null;
+  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const obj = { medication: med.id, med_name: med.name };
+  let hasData = false;
+  med.fields.forEach(f=>{
+    const el = document.getElementById(`m_${med.id}_quick_${f}`);
+    if(el && el.value !== ''){ obj[f] = el.value; hasData = true; }
+  });
+  if(med.mgPerTab && obj.tablets) obj.mg = (+obj.tablets) * med.mgPerTab;
+  return hasData ? obj : null;
+}
+
+function getMedsRecord(date, create){
+  const existing = Store.getByDate('meds', date);
+  if(existing) return { ...existing, entries: [...existing.entries] };
+  if(!create) return null;
+  return {
+    submission_id: nowStamp(),
+    entry_date: date,
+    backfilled: date < todayISO(),
+    entries: []
+  };
+}
+
+function persistMedsRecord(rec){
+  if(!rec.entries.length){
+    Store.deleteBySubmission('meds', rec.submission_id);
+    return;
+  }
+  Store.put('meds', rec);
+}
+
+function logIntake(){
+  const date = $('#m_date').value;
+  if(!date){ toast(t('toast_set_log_date')); return; }
+  const entry = collectQuickMedEntry();
+  if(!entry){ toast(t('toast_fill_field')); return; }
+  const rec = getMedsRecord(date, true);
+  const existing = Store.getByDate('meds', date);
+  if(existing) rec.submission_id = existing.submission_id;
+  rec.entries.push(entry);
+  persistMedsRecord(rec);
+  clearMedQuickFields();
+  renderMedLedger();
+  updateMedsSub();
+  toast(t('toast_intake_logged'));
+}
+
+function removeMedEntry(idx){
+  const date = $('#m_date').value;
+  const rec = getMedsRecord(date, false);
+  if(!rec) return;
+  rec.entries.splice(idx, 1);
+  persistMedsRecord(rec);
+  renderMedLedger();
+  updateMedsSub();
+}
+
+function medLineDisplay(m){
+  const parts = [t('med_'+m.medication) || m.med_name];
+  if(m.substance) parts.push(t(m.substance) || m.substance);
+  if(m.time) parts.push(m.time);
+  if(m.tablets) parts.push(`${m.tablets}tab${m.mg ? ` (${m.mg}mg)` : ''}`);
+  if(m.amount) parts.push(m.amount);
+  if(m.withFood) parts.push(`${t('food_label')}:${m.withFood === 'Yes' ? t('yes') : m.withFood === 'No' ? t('no') : m.withFood}`);
+  if(m.effect) parts.push(`→ ${m.effect}`);
+  if(m.notes) parts.push(`(${m.notes})`);
+  return parts.map(p=>esc(String(p))).join(' · ');
+}
+
+function renderMedLedger(){
+  const host = $('#med_ledger');
+  const date = $('#m_date').value;
+  const rec = date ? Store.getByDate('meds', date) : null;
+  const entries = rec && rec.entries ? rec.entries : [];
+  if(!entries.length){
+    host.innerHTML = `<div class="empty">${esc(t('ledger_empty'))}</div>`;
+    return;
+  }
+  host.innerHTML = entries.map((e,i)=>`
+    <div class="med-ledger-item">
+      <span>${medLineDisplay(e)}</span>
+      <button type="button" class="btn-rm-ledger" onclick="removeMedEntry(${i})" aria-label="remove">×</button>
+    </div>`).join('');
+}
+
+function updateMedsSub(){
+  const date = $('#m_date').value;
+  const ex = date && Store.getByDate('meds', date);
+  const n = ex && ex.entries ? ex.entries.length : 0;
+  $('#medsSub').textContent = ex ? t('meds_sub_onfile', {date: fmtDate(date), n}) : t('meds_sub');
+}
+
+function loadMeds(date){
+  if(!date) return;
+  $('#m_date').value = date;
+  clearMedQuickFields();
+  renderMedLedger();
+  updateMedsSub();
+}
+
+$('#med_selector').addEventListener('change', renderMedQuickFields);
+$('#m_date').addEventListener('change', ()=>loadMeds($('#m_date').value));
+initMedSelector();
+
+function medLineHTML(m){ return medLineDisplay(m); }
+
+function editFromLog(date, coll){
+  if(coll==='daily') loadDaily(date);
+  else if(coll==='assess') loadAssess(date);
+  else if(coll==='meds') loadMeds(date);
+  switchSeg(coll);
+  toast(`${t('toast_editing')} ${t('tab_'+coll)} · ${fmtDate(date)}`);
+}
+
 function renderLog(){
   const all = Store.everything();
   const byDate = {};
   ['daily','assess','meds'].forEach(coll=>{
-    all[coll].forEach(r=>{ (byDate[r.entry_date]=byDate[r.entry_date]||{})[coll]=r; });
+    all[coll].forEach(r=>{
+      const slot = byDate[r.entry_date] = byDate[r.entry_date] || {};
+      if(!slot[coll] || r.submission_id > slot[coll].submission_id) slot[coll] = r;
+    });
   });
   const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   const list=$('#logList');
-  if(!dates.length){ list.innerHTML='<div class="empty">No entries yet.</div>'; return; }
+  if(!dates.length){ list.innerHTML=`<div class="empty">${esc(t('log_empty'))}</div>`; return; }
   list.innerHTML = dates.map(date=>{
     const e=byDate[date];
-    let valTag='';
-    if(e.daily && typeof e.daily.valence==='number'){ valTag = `valence ${e.daily.valence.toFixed(2)}`; }
-    else if(e.assess){ valTag = `PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`; }
-    else if(e.meds){ valTag = `${e.meds.entries.length} med entr${e.meds.entries.length===1?'y':'ies'}`; }
+    const tags=[];
+    if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
+    if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
+    if(e.meds && e.meds.entries && e.meds.entries.length)
+      tags.push(`${e.meds.entries.length} ${t('log_med_entries')}`);
+    const valTag = tags.join(' · ') || '—';
     let body='<dl>';
     if(e.daily){
       const d=e.daily;
-      body+=`<dt>mood</dt><dd>${valWord(d.valence*100)} (${d.valence.toFixed(2)})</dd>`;
-      if(d.body_sensations&&d.body_sensations.length) body+=`<dt>body</dt><dd>${d.body_sensations.join(', ')}${d.body_tension_where?` · tension: ${d.body_tension_where}`:''}${d.body_other?` · ${d.body_other}`:''}</dd>`;
-      if(d.biological_fact) body+=`<dt>bio fact</dt><dd>${esc(d.biological_fact)}</dd>`;
-      if(d.note) body+=`<dt>note</dt><dd>${esc(d.note)}</dd>`;
+      body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
+      if(d.body_sensations&&d.body_sensations.length){
+        const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
+          + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
+          + (d.body_other ? ` · ${esc(d.body_other)}` : '');
+        body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
+      }
+      if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
+      if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
     }
     if(e.assess){
       const a=e.assess;
-      body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${phqSeverity(a.phq9_total)})${a.phq9_complete?'':' · incomplete'}</dd>`;
-      body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${gadSeverity(a.gad7_total)})${a.gad7_complete?'':' · incomplete'}</dd>`;
-      if(a.functional_difficulty) body+=`<dt>difficulty</dt><dd>${a.functional_difficulty}</dd>`;
+      const inc = ' · ' + t('log_incomplete');
+      body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${esc(t(phqSeverity(a.phq9_total)))})${a.phq9_complete?'':inc}</dd>`;
+      body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
+      if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
     }
     if(e.meds && e.meds.entries.length){
-      const lines = e.meds.entries.map(m=>{
-        const parts=[m.med_name];
-        if(m.substance) parts.push(m.substance);
-        if(m.time) parts.push(m.time);
-        if(m.tablets) parts.push(`${m.tablets}tab${m.mg?` (${m.mg}mg)`:''}`);
-        if(m.amount) parts.push(m.amount);
-        if(m.withFood) parts.push(`food:${m.withFood}`);
-        if(m.effect) parts.push(`→ ${m.effect}`);
-        if(m.notes) parts.push(`(${m.notes})`);
-        return parts.join(' · ');
-      }).join('<br>');
-      body+=`<dt>meds</dt><dd>${lines}</dd>`;
+      const lines = e.meds.entries.map(medLineHTML).join('<br>');
+      body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
     }
     body+='</dl>';
-    const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · backfilled' : '';
-    return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${valTag}</span></summary><div class="log-body">${body}</div></details>`;
+    const edits=[];
+    if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
+    if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
+    if(e.meds && e.meds.entries && e.meds.entries.length)
+      edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
+    const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
+    const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
+    return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${esc(valTag)}</span></summary><div class="log-body">${body}${editRow}</div></details>`;
   }).join('');
 }
-function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+$('#logList').addEventListener('click', e=>{
+  const btn = e.target.closest('.btn-log-edit');
+  if(!btn) return;
+  editFromLog(btn.dataset.date, btn.dataset.coll);
+});
 
-/* ---------- EXPORT ---------- */
 function exportJSON(){
   const blob=new Blob([JSON.stringify(Store.everything(),null,2)],{type:'application/json'});
   dl(blob, `monitor_export_${todayISO()}.json`);
@@ -656,8 +1005,12 @@ function exportCSV(){
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
 
-/* ---------- init ---------- */
+rebuildAssessItems();
+loadDaily(todayISO());
+loadAssess(todayISO());
+loadMeds(todayISO());
 refreshDueBanner();
+renderI18n();
 </script>
 </body>
 </html>
