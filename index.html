@@ -412,6 +412,23 @@ const Store = {
     if (typeof updateSyncUI === 'function') updateSyncUI();
   },
 
+  // Convert a cloud-returned entry_date back to a plain local YYYY-MM-DD.
+  // The Sheet coerces "2026-05-23" into a date and returns it as a UTC
+  // timestamp ("2026-05-22T16:00:00.000Z"). Interpreting that timestamp in
+  // the browser's LOCAL timezone (Taipei = UTC+8) recovers the intended day.
+  // A value already in YYYY-MM-DD form is passed through untouched.
+  _normalizeDate(val) {
+    if (val === null || val === undefined || val === '') return val;
+    const s = String(val);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;          // already a plain date
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;                      // unparseable → leave as-is
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
   async hydrateFromCloud() {
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
@@ -420,31 +437,54 @@ const Store = {
       const textResult = await res.text();
       console.log('Hydration response:', textResult);
       const data = JSON.parse(textResult);
-      if (data.daily !== undefined || data.assess !== undefined || data.meds !== undefined) {
-        const JSON_FIELDS = {
-          daily: ['body_sensations'],
-          assess: ['phq9_items', 'gad7_items'],
-          meds: ['entries']
-        };
-        const reparse = (coll, rows) => (rows || []).map(r => {
-          (JSON_FIELDS[coll] || []).forEach(f => {
-            if (typeof r[f] === 'string') {
-              try { r[f] = JSON.parse(r[f]); } catch (e) {}
-            }
-          });
-          return r;
+      if (data.daily === undefined && data.assess === undefined && data.meds === undefined) return;
+
+      // Fields stored as JSON strings in the Sheet that must be parsed back to objects/arrays.
+      const JSON_FIELDS = {
+        daily: ['body_sensations'],
+        assess: ['phq9_items', 'gad7_items'],
+        meds: ['entries']
+      };
+      // reparse JSON-string fields AND normalize entry_date for one collection's rows.
+      const clean = (coll, rows) => (rows || []).map(r => {
+        (JSON_FIELDS[coll] || []).forEach(f => {
+          if (typeof r[f] === 'string') {
+            try { r[f] = JSON.parse(r[f]); } catch (e) {}
+          }
         });
-        const normalized = {
-          daily: reparse('daily', data.daily),
-          assess: reparse('assess', data.assess),
-          meds: reparse('meds', data.meds)
-        };
-        const current = JSON.stringify(this._all());
-        const incoming = JSON.stringify(normalized);
-        if (current !== incoming) {
-          this._commit(normalized);
-          location.reload();
-        }
+        if (r.entry_date !== undefined) r.entry_date = Store._normalizeDate(r.entry_date);
+        return r;
+      });
+
+      const cloud = {
+        daily: clean('daily', data.daily),
+        assess: clean('assess', data.assess),
+        meds: clean('meds', data.meds)
+      };
+
+      // --- MERGE, don't replace -------------------------------------------
+      // Start from the cloud copy, then overlay any LOCAL record still marked
+      // _dirty (i.e. not yet synced). This guarantees an entry created offline
+      // on one device is never erased by a hydrate that ran before it synced.
+      const local = this._all();
+      const merged = {};
+      ['daily', 'assess', 'meds'].forEach(coll => {
+        const bySub = {};
+        (cloud[coll] || []).forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
+        (local[coll] || []).forEach(r => {
+          if (r && r._dirty && r.submission_id) bySub[r.submission_id] = r;  // unsynced local wins
+        });
+        // deterministic order so the change-comparison below doesn't fire on reordering alone
+        merged[coll] = Object.values(bySub).sort((a, b) =>
+          String(a.submission_id).localeCompare(String(b.submission_id)));
+      });
+
+      // Only commit + reload if the merge actually changes local state.
+      const before = JSON.stringify(this._all());
+      const after = JSON.stringify(merged);
+      if (before !== after) {
+        this._commit(merged);
+        location.reload();
       }
     } catch (e) {
       console.error('Hydration failed', e);
