@@ -312,9 +312,7 @@ input[type=range].valence::-moz-range-thumb {
 </section>
 
 <div class="footnote" data-i18n="footnote">
-  Demo build · data stored locally in this browser only (localStorage) · nothing is sent anywhere.
-  PHQ-9 / GAD-7 item wording &amp; scoring per Spitzer, Williams, Kroenke et al., 1999 (no permission required to reproduce).
-  Storage is routed through Store.* for later swap to a cloud backend — see handoff notes.
+  Data stored locally and synced to your private Google Sheet.
 </div>
 
 <div class="toast" id="toast"></div>
@@ -528,7 +526,7 @@ const I18N = {
   due_countdown:{en:'Last assessment {days} day(s) ago ({date}). Next due in {left} day(s).',zh:'上次評估 {days} 天前（{date}）。{left} 天後到期。'},
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
-  footnote:{en:'Demo build · data stored locally in this browser only (localStorage) · nothing is sent anywhere. PHQ-9 / GAD-7 item wording & scoring per Spitzer, Williams, Kroenke et al., 1999 (no permission required to reproduce). Storage is routed through Store.* for later swap to a cloud backend — see handoff notes.',zh:'示範版本 · 資料僅存於此瀏覽器本機（localStorage）· 不會傳送至任何地方。PHQ-9 / GAD-7 題目與計分依 Spitzer, Williams, Kroenke 等，1999。儲存經 Store.* 路由，可日後換為雲端後端。'},
+  footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
   'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
@@ -1166,3 +1164,8 @@ window.addEventListener('offline', updateSyncUI);
 </script>
 </body>
 </html>
+
+window.addEventListener('load', () => {
+  Store.hydrateFromCloud(); // 網頁載入時強制拉取
+  Store.syncQueue();        // 同步處理待辦佇列
+});
