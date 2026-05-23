@@ -322,41 +322,14 @@ input[type=range].valence::-moz-range-thumb {
 <script>
 const Store = {
   _key: 'monitor_v1',
-  _collections: ['daily', 'assess', 'meds'],
-  _syncing: false,
+  get endpoint() { return localStorage.getItem('monitor_endpoint'); },
+
+  // --- CORE LOCAL READ/WRITE (RESTORED) ---
   _all() {
     try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
     catch(e){ return {daily:[],assess:[],meds:[]}; }
   },
   _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
-  _stripDirty(record){
-    const copy = Object.assign({}, record);
-    delete copy._dirty;
-    return copy;
-  },
-  countDirty(){
-    const d = this._all();
-    let n = 0;
-    this._collections.forEach(coll=>{
-      d[coll].forEach(r=>{ if(r._dirty) n++; });
-    });
-    return n;
-  },
-  put(coll, record){
-    record._dirty = true;
-    const d = this._all();
-    const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
-    if (i >= 0) d[coll][i] = record; else d[coll].push(record);
-    this._commit(d);
-    updateSyncUI();
-    this.syncQueue();
-  },
-  deleteBySubmission(coll, submission_id){
-    const d = this._all();
-    d[coll] = d[coll].filter(r => r.submission_id !== submission_id);
-    this._commit(d);
-    updateSyncUI();
-  },
   getByDate(coll, date){
     const d = this._all();
     return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
@@ -365,42 +338,70 @@ const Store = {
   everything(){ return this._all(); },
   exportClean(){
     const d = this._all();
-    const out = { daily:[], assess:[], meds:[] };
-    this._collections.forEach(coll=>{
-      out[coll] = d[coll].map(r=>this._stripDirty(r));
-    });
-    return out;
+    // remove _dirty flags for export
+    ['daily','assess','meds'].forEach(c => d[c].forEach(r => delete r._dirty));
+    return d;
   },
-  async syncQueue(){
-    if(this._syncing) return;
-    const ENDPOINT = localStorage.getItem('monitor_endpoint');
-    if(!ENDPOINT) return;
-    if(!navigator.onLine){ updateSyncUI(); return; }
-    this._syncing = true;
-    updateSyncUI();
-    try {
-      const d = this._all();
-      let changed = false;
-      for(const coll of this._collections){
-        for(const record of d[coll]){
-          if(!record._dirty) continue;
-          const rec = this._stripDirty(record);
-          const res = await fetch(ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ collection: coll, record: rec })
-          });
-          if(res.status === 200){
-            const idx = d[coll].findIndex(r => r.submission_id === record.submission_id);
-            if(idx >= 0){ d[coll][idx]._dirty = false; changed = true; }
+  deleteBySubmission(coll, submission_id){
+    const d = this._all();
+    d[coll] = d[coll].filter(r => r.submission_id !== submission_id);
+    this._commit(d);
+    if (typeof updateSyncUI === 'function') updateSyncUI();
+  },
+  countDirty(){
+    const d = this._all();
+    let n = 0;
+    ['daily','assess','meds'].forEach(c => d[c].forEach(r => { if(r._dirty) n++; }));
+    return n;
+  },
+
+  // --- NEW SYNC LOGIC ---
+  put(coll, record) {
+    const d = this._all();
+    record._dirty = true; // Mark for sync
+    const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
+    if (i >= 0) d[coll][i] = record; else d[coll].push(record);
+    this._commit(d);
+
+    if (typeof updateSyncUI === 'function') updateSyncUI();
+    this.syncQueue(); // Non-blocking trigger
+  },
+
+  async syncQueue() {
+    const url = this.endpoint;
+    if (!url || !navigator.onLine) return;
+
+    const d = this._all();
+    let updated = false;
+
+    for (const coll of ['daily', 'assess', 'meds']) {
+      for (let i = 0; i < d[coll].length; i++) {
+        const rec = d[coll][i];
+        if (rec._dirty) {
+          try {
+            // FIX: Send as text/plain to bypass CORS preflight on GAS
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ collection: coll, record: rec })
+            });
+            const result = await res.json();
+
+            if (result.status === "success") {
+              rec._dirty = false;
+              updated = true;
+            }
+          } catch (e) {
+            console.error("Sync failed for record", rec.submission_id, e);
+            // Fail silently, leave _dirty as true to retry later
           }
         }
       }
-      if(changed) this._commit(d);
-    } catch(e) { /* fail silently — retry later */ }
-    finally {
-      this._syncing = false;
-      updateSyncUI();
+    }
+
+    if (updated) {
+      this._commit(d);
+      if (typeof updateSyncUI === 'function') updateSyncUI();
     }
   }
 };
