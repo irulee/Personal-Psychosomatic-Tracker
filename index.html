@@ -1177,8 +1177,3 @@ window.addEventListener('offline', updateSyncUI);
 </script>
 </body>
 </html>
-
-window.addEventListener('load', () => {
-  Store.hydrateFromCloud(); // 網頁載入時強制拉取
-  Store.syncQueue();        // 同步處理待辦佇列
-});
