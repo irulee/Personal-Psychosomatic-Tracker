@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>monitor</title>
+<style>
+:root {
+  --bg: #e8e6df;
+  --panel: #f4f2ec;
+  --ink: #1a1a17;
+  --ink-soft: #555049;
+  --line: #c4c0b6;
+  --line-strong: #1a1a17;
+  --accent: #1a1a17;
+  --neg: #2b4a6f;
+  --pos: #c2632a;
+  --mid: #8a8576;
+  --field: #fbfaf6;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-size: 14px; line-height: 1.5; }
+body { padding: 0 0 80px; -webkit-font-smoothing: antialiased; }
+
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 18px; }
+
+header.top {
+  border-bottom: 1.5px solid var(--line-strong);
+  padding: 18px 0 14px;
+  margin-bottom: 0;
+  position: sticky; top: 0; background: var(--bg); z-index: 20;
+}
+.top-row { display: flex; align-items: baseline; justify-content: space-between; }
+.brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+.datestamp { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.05em; }
+
+nav.tabs { display: flex; gap: 0; margin-top: 14px; border: 1.5px solid var(--line-strong); }
+nav.tabs button {
+  flex: 1; background: var(--panel); border: none; border-right: 1.5px solid var(--line-strong);
+  padding: 9px 6px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer; color: var(--ink-soft); transition: background 0.12s;
+}
+nav.tabs button:last-child { border-right: none; }
+nav.tabs button:hover { background: #ece9e1; }
+nav.tabs button.active { background: var(--ink); color: var(--bg); font-weight: 700; }
+
+main { padding-top: 22px; }
+.seg { display: none; }
+.seg.active { display: block; animation: fade 0.2s ease; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+.seg-head { font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 3px; }
+.seg-sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 22px; letter-spacing: 0.02em; }
+
+.block { background: var(--panel); border: 1.5px solid var(--line-strong); padding: 18px; margin-bottom: 16px; }
+.block-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+.block-title .hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--mid); font-size: 11px; }
+
+label.fld { display: block; margin-bottom: 13px; }
+label.fld > .lab { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; letter-spacing: 0.02em; }
+input[type=text], input[type=number], input[type=time], input[type=date], textarea, select {
+  width: 100%; background: var(--field); border: 1px solid var(--line); padding: 8px 9px;
+  font-family: var(--mono); font-size: 14px; color: var(--ink); border-radius: 0;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--line-strong); }
+textarea { resize: vertical; min-height: 64px; line-height: 1.55; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+
+/* valence slider */
+.valence-wrap { padding: 6px 2px 2px; }
+.valence-readout { text-align: center; font-family: var(--serif); font-size: 19px; margin-bottom: 14px; min-height: 26px; transition: color 0.15s; }
+.valence-readout .vnum { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+input[type=range].valence {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 38px; background: transparent; cursor: pointer; margin: 0;
+}
+.valence-track { height: 10px; border: 1.5px solid var(--line-strong); margin: 0 0 -24px; background: linear-gradient(90deg, var(--neg) 0%, #b8b2a4 50%, var(--pos) 100%); }
+input[type=range].valence::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 30px; background: var(--field);
+  border: 1.5px solid var(--line-strong); cursor: pointer; box-shadow: 1px 1px 0 var(--line-strong);
+}
+input[type=range].valence::-moz-range-thumb {
+  width: 16px; height: 30px; background: var(--field); border: 1.5px solid var(--line-strong); border-radius: 0; cursor: pointer;
+}
+.valence-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.03em; }
+
+/* chips */
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  border: 1px solid var(--line-strong); background: var(--field); padding: 6px 11px; font-family: var(--mono);
+  font-size: 12px; cursor: pointer; user-select: none; transition: all 0.1s; letter-spacing: 0.02em;
+}
+.chip:hover { background: #ece9e1; }
+.chip.on { background: var(--ink); color: var(--bg); }
+.chip-other-input { margin-top: 8px; display: none; }
+.chip-other-input.show { display: block; }
+
+/* assessment */
+.q { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.q:last-child { border-bottom: none; }
+.q-text { font-size: 13px; margin-bottom: 9px; line-height: 1.45; }
+.q-text .qn { color: var(--mid); margin-right: 7px; }
+.opts { display: flex; gap: 0; border: 1px solid var(--line-strong); }
+.opts label {
+  flex: 1; text-align: center; padding: 7px 3px; font-size: 11px; cursor: pointer; border-right: 1px solid var(--line);
+  background: var(--field); transition: background 0.1s; line-height: 1.25; letter-spacing: 0.01em;
+}
+.opts label:last-child { border-right: none; }
+.opts label:hover { background: #ece9e1; }
+.opts input { display: none; }
+.opts input:checked + span { font-weight: 700; }
+.opts label.sel { background: var(--ink); color: var(--bg); }
+.opts label .ov { display: block; font-size: 14px; font-weight: 700; margin-bottom: 1px; }
+
+.assess-meta { display: flex; gap: 12px; margin-bottom: 4px; }
+.score-line { font-family: var(--serif); font-size: 18px; margin-top: 6px; padding-top: 12px; border-top: 1.5px solid var(--line-strong); display: flex; justify-content: space-between; align-items: baseline; }
+.score-line .sv { font-family: var(--mono); font-weight: 700; }
+.severity { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); }
+
+.due-banner { background: var(--ink); color: var(--bg); padding: 11px 14px; font-size: 12px; letter-spacing: 0.04em; margin-bottom: 16px; }
+.due-banner.notdue { background: var(--panel); color: var(--ink-soft); border: 1px solid var(--line); }
+
+/* med entries */
+.med-tmpl { border: 1px solid var(--line); background: var(--field); padding: 13px; margin-bottom: 10px; position: relative; }
+.med-tmpl .med-name { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; margin-bottom: 10px; }
+.dose-row { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 10px; }
+.dose-row:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.btn-add { background: var(--field); border: 1px solid var(--line-strong); padding: 6px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; cursor: pointer; text-transform: uppercase; }
+.btn-add:hover { background: var(--ink); color: var(--bg); }
+.btn-rm { position: absolute; top: 10px; right: 10px; background: none; border: 1px solid var(--line); width: 22px; height: 22px; cursor: pointer; font-family: var(--mono); font-size: 13px; line-height: 1; color: var(--ink-soft); }
+.btn-rm:hover { border-color: var(--line-strong); background: var(--ink); color: var(--bg); }
+
+.actions { display: flex; gap: 10px; margin-top: 6px; }
+.btn-primary { flex: 1; background: var(--ink); color: var(--bg); border: 1.5px solid var(--line-strong); padding: 13px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; cursor: pointer; }
+.btn-primary:hover { background: #000; }
+.btn-ghost { background: var(--panel); border: 1.5px solid var(--line-strong); padding: 13px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.btn-ghost:hover { background: #ece9e1; }
+
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: var(--bg); padding: 11px 20px; font-size: 12px; letter-spacing: 0.05em; z-index: 50; transition: transform 0.25s; border: 1.5px solid var(--line-strong); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* log */
+.log-entry { border: 1px solid var(--line-strong); background: var(--panel); margin-bottom: 10px; }
+.log-entry summary { padding: 11px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; list-style: none; }
+.log-entry summary::-webkit-details-marker { display: none; }
+.log-entry summary .ld { font-weight: 700; letter-spacing: 0.03em; }
+.log-entry summary .lv { font-size: 11px; color: var(--ink-soft); }
+.log-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
+.log-body dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 12px; margin-top: 10px; }
+.log-body dt { color: var(--mid); }
+.log-body dd { color: var(--ink); }
+.empty { color: var(--mid); font-size: 12px; padding: 20px 0; text-align: center; }
+.export-row { display: flex; gap: 10px; margin: 18px 0; }
+
+.footnote { font-size: 11px; color: var(--mid); line-height: 1.6; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
+.footnote code { background: var(--panel); padding: 1px 4px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <span class="brand">— monitor —</span>
+      <span class="datestamp" id="todayStamp"></span>
+    </div>
+    <nav class="tabs">
+      <button data-seg="daily" class="active">Daily</button>
+      <button data-seg="assess">Assessment</button>
+      <button data-seg="meds">Medication</button>
+      <button data-seg="log">Log</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ DAILY ============ -->
+<section class="seg active" id="seg-daily">
+  <div class="seg-head">Daily entry</div>
+  <div class="seg-sub" id="dailySub">mood · body · biological fact · note</div>
+
+  <label class="fld">
+    <span class="lab">Entry date</span>
+    <input type="date" id="d_date">
+  </label>
+
+  <div class="block">
+    <div class="block-title">Mood <span class="hint">how does this moment feel</span></div>
+    <div class="valence-wrap">
+      <div class="valence-readout" id="valReadout">—<span class="vnum"></span></div>
+      <div class="valence-track"></div>
+      <input type="range" class="valence" id="d_valence" min="-100" max="100" value="0" step="1">
+      <div class="valence-ends"><span>very unpleasant</span><span>neutral</span><span>very pleasant</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Body sensations <span class="hint">select any</span></div>
+    <div class="chips" id="d_body"></div>
+    <input type="text" class="chip-other-input" id="d_body_other" placeholder="other — describe">
+    <input type="text" class="chip-other-input" id="d_body_tension" placeholder="tension — where?">
+  </div>
+
+  <div class="block">
+    <div class="block-title">Biological fact <span class="hint">ate / slept / pain / etc.</span></div>
+    <textarea id="d_bio" placeholder="one concrete bodily fact, if any"></textarea>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Note <span class="hint">optional</span></div>
+    <textarea id="d_note" placeholder="anything worth keeping — a thought, a moment, a line to your future self"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="saveDaily()">Save entry</button>
+    <button class="btn-ghost" onclick="resetDaily()">Clear</button>
+  </div>
+</section>
+
+<!-- ============ ASSESSMENT ============ -->
+<section class="seg" id="seg-assess">
+  <div class="seg-head">Assessment</div>
+  <div class="seg-sub">PHQ-9 &amp; GAD-7 · biweekly</div>
+
+  <div id="dueBanner"></div>
+
+  <label class="fld">
+    <span class="lab">Assessment date</span>
+    <input type="date" id="a_date">
+  </label>
+
+  <div class="block">
+    <div class="block-title">PHQ-9 <span class="hint">over the last 2 weeks</span></div>
+    <div id="phq9"></div>
+    <div class="score-line">PHQ-9 total <span class="sv" id="phq9score">0</span></div>
+    <div class="severity" id="phq9sev"></div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">GAD-7 <span class="hint">over the last 2 weeks</span></div>
+    <div id="gad7"></div>
+    <div class="score-line">GAD-7 total <span class="sv" id="gad7score">0</span></div>
+    <div class="severity" id="gad7sev"></div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">Functional difficulty <span class="hint">if any problems checked</span></div>
+    <label class="fld">
+      <span class="lab">How difficult have these made your work, home, or relationships?</span>
+      <select id="a_difficulty">
+        <option value="">—</option>
+        <option>Not difficult at all</option>
+        <option>Somewhat difficult</option>
+        <option>Very difficult</option>
+        <option>Extremely difficult</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="saveAssess()">Save assessment</button>
+    <button class="btn-ghost" onclick="resetAssess()">Clear</button>
+  </div>
+</section>
+
+<!-- ============ MEDICATION ============ -->
+<section class="seg" id="seg-meds">
+  <div class="seg-head">Medication</div>
+  <div class="seg-sub">retrospective daily log · type · time · dose · effect</div>
+
+  <label class="fld">
+    <span class="lab">Log date</span>
+    <input type="date" id="m_date">
+  </label>
+
+  <div id="medContainer"></div>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="saveMeds()">Save medication log</button>
+    <button class="btn-ghost" onclick="resetMeds()">Clear</button>
+  </div>
+</section>
+
+<!-- ============ LOG ============ -->
+<section class="seg" id="seg-log">
+  <div class="seg-head">Log</div>
+  <div class="seg-sub">recent entries · newest first</div>
+  <div class="export-row">
+    <button class="btn-ghost" onclick="exportJSON()">Export JSON</button>
+    <button class="btn-ghost" onclick="exportCSV()">Export CSV</button>
+  </div>
+  <div id="logList"></div>
+</section>
+
+<div class="footnote">
+  Demo build · data stored locally in this browser only (<code>localStorage</code>) · nothing is sent anywhere.
+  PHQ-9 / GAD-7 item wording &amp; scoring per Spitzer, Williams, Kroenke et al., 1999 (no permission required to reproduce).
+  Storage is routed through <code>Store.*</code> for later swap to a cloud backend — see handoff notes.
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   STORAGE LAYER  —  swap these four functions for cloud sync.
+   Every read/write in the app goes through Store.*
+   ============================================================ */
+const Store = {
+  _key: 'monitor_v1',
+  _all() {
+    try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
+    catch(e){ return {daily:[],assess:[],meds:[]}; }
+  },
+  _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
+  // upsert by submission_id within a collection ('daily'|'assess'|'meds')
+  put(coll, record){
+    const d = this._all();
+    const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
+    if (i >= 0) d[coll][i] = record; else d[coll].push(record);
+    this._commit(d);
+  },
+  // get one record for a given entry_date in a collection (or null)
+  getByDate(coll, date){
+    const d = this._all();
+    return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
+  },
+  list(coll){ return this._all()[coll]; },
+  everything(){ return this._all(); }
+};
+
+/* ---------- constants ---------- */
+const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach discomfort','Shallow breathing','Restlessness','Numbness','Neutral','Other'];
+
+const PHQ9_ITEMS = [
+  "Little interest or pleasure in doing things.",
+  "Feeling down, depressed, or hopeless.",
+  "Trouble falling or staying asleep, or sleeping too much.",
+  "Feeling tired or having little energy.",
+  "Poor appetite or overeating.",
+  "Feeling bad about yourself \u2013 or that you are a failure or have let yourself or your family down.",
+  "Trouble concentrating on things, such as reading the newspaper or watching television.",
+  "Moving or speaking so slowly that other people could have noticed. Or the opposite \u2013 being so fidgety or restless that you have been moving around a lot more than usual.",
+  "Thoughts that you would be better off dead, or of hurting yourself in some way."
+];
+const GAD7_ITEMS = [
+  "Feeling nervous, anxious, or on edge.",
+  "Not being able to stop or control worrying.",
+  "Worrying too much about different things.",
+  "Trouble relaxing.",
+  "Being so restless that it\u2019s hard to sit still.",
+  "Becoming easily annoyed or irritable.",
+  "Feeling afraid as if something awful might happen."
+];
+const OPTS = ["Not at all","Several days","More than half the days","Nearly every day"];
+
+// Medication templates: pattern-grouped per user's prescription profile.
+const MED_TEMPLATES = [
+  { id:'wellbutrin', name:'Wellbutrin XL 300mg', pattern:'daily', fields:['time','withFood'], multi:false },
+  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','time'], multi:false, mgPerTab:7.5 },
+  { id:'ritalin',    name:'Ritalin 10mg', pattern:'prn-frequent', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
+  { id:'recreational', name:'Recreational / other', pattern:'rare', fields:['substance','time','amount','notes'], multi:true,
+    options:['THC (vape)','THC (flower)','THC (edible)','Alcohol','MDMA / ecstasy','Ketamine','Other'] }
+];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function nowStamp(){ return new Date().toISOString(); }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
+
+/* ---------- tabs ---------- */
+$$('nav.tabs button').forEach(b=>{
+  b.onclick=()=>{
+    $$('nav.tabs button').forEach(x=>x.classList.remove('active'));
+    $$('.seg').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    $('#seg-'+b.dataset.seg).classList.add('active');
+    if(b.dataset.seg==='log') renderLog();
+    if(b.dataset.seg==='assess') refreshDueBanner();
+  };
+});
+
+/* ---------- date init ---------- */
+$('#todayStamp').textContent = fmtDate(todayISO());
+['#d_date','#a_date','#m_date'].forEach(id=>{ $(id).value = todayISO(); });
+
+/* ---------- DAILY: valence ---------- */
+const VAL_WORDS = [
+  {max:-60,w:'Very unpleasant'},{max:-20,w:'Unpleasant'},{max:20,w:'Neutral'},
+  {max:60,w:'Pleasant'},{max:101,w:'Very pleasant'}
+];
+function valWord(v){ for(const s of VAL_WORDS){ if(v<s.max) return s.w; } return 'Neutral'; }
+function valColor(v){
+  // -100 -> neg(blue), 0 -> mid, +100 -> pos(orange)
+  if(v<0){ return `var(--neg)`; } if(v>0){ return `var(--pos)`; } return `var(--ink-soft)`;
+}
+const valSlider = $('#d_valence');
+function updateValence(){
+  const v = +valSlider.value;
+  const r = $('#valReadout');
+  r.innerHTML = `${valWord(v)} <span class="vnum">(${(v/100).toFixed(2)})</span>`;
+  r.style.color = valColor(v);
+}
+valSlider.addEventListener('input', updateValence);
+updateValence();
+
+/* ---------- DAILY: body chips ---------- */
+const bodyWrap = $('#d_body');
+BODY_SENSATIONS.forEach(s=>{
+  const c=document.createElement('div'); c.className='chip'; c.textContent=s; c.dataset.val=s;
+  c.onclick=()=>{
+    c.classList.toggle('on');
+    if(s==='Other') $('#d_body_other').classList.toggle('show', c.classList.contains('on'));
+    if(s==='Tension') $('#d_body_tension').classList.toggle('show', c.classList.contains('on'));
+  };
+  bodyWrap.appendChild(c);
+});
+
+function collectDaily(){
+  const body = $$('#d_body .chip.on').map(c=>c.dataset.val);
+  return {
+    submission_id: nowStamp(),
+    entry_date: $('#d_date').value,
+    backfilled: $('#d_date').value < todayISO(),
+    valence: (+valSlider.value)/100,
+    body_sensations: body,
+    body_tension_where: body.includes('Tension') ? $('#d_body_tension').value.trim() : '',
+    body_other: body.includes('Other') ? $('#d_body_other').value.trim() : '',
+    biological_fact: $('#d_bio').value.trim(),
+    note: $('#d_note').value.trim()
+  };
+}
+function saveDaily(){
+  if(!$('#d_date').value){ toast('Set an entry date'); return; }
+  const existing = Store.getByDate('daily', $('#d_date').value);
+  const rec = collectDaily();
+  if(existing) rec.submission_id = existing.submission_id; // upsert same day
+  Store.put('daily', rec);
+  toast(existing ? 'Daily entry updated' : 'Daily entry saved');
+}
+function resetDaily(){
+  valSlider.value=0; updateValence();
+  $$('#d_body .chip.on').forEach(c=>c.classList.remove('on'));
+  $('#d_body_other').classList.remove('show'); $('#d_body_tension').classList.remove('show');
+  $('#d_body_other').value=''; $('#d_body_tension').value='';
+  $('#d_bio').value=''; $('#d_note').value=''; $('#d_date').value=todayISO();
+}
+
+/* ---------- ASSESSMENT: build items ---------- */
+function buildAssessItems(containerId, items, prefix){
+  const wrap = $(containerId);
+  items.forEach((txt,i)=>{
+    const q=document.createElement('div'); q.className='q';
+    const opts = OPTS.map((o,oi)=>`
+      <label data-q="${prefix}${i}" data-v="${oi}">
+        <input type="radio" name="${prefix}${i}" value="${oi}">
+        <span class="ov">${oi}</span>${o}
+      </label>`).join('');
+    q.innerHTML = `<div class="q-text"><span class="qn">${i+1}.</span>${txt}</div><div class="opts">${opts}</div>`;
+    wrap.appendChild(q);
+  });
+  wrap.addEventListener('change', e=>{
+    if(e.target.name && e.target.name.startsWith(prefix)){
+      // visual select state
+      $$(`.opts label[data-q="${e.target.name}"]`).forEach(l=>l.classList.remove('sel'));
+      e.target.closest('label').classList.add('sel');
+      computeScores();
+    }
+  });
+}
+buildAssessItems('#phq9', PHQ9_ITEMS, 'p');
+buildAssessItems('#gad7', GAD7_ITEMS, 'g');
+
+function getScores(prefix, n){
+  let sum=0, answered=0, arr=[];
+  for(let i=0;i<n;i++){
+    const sel=document.querySelector(`input[name="${prefix}${i}"]:checked`);
+    const v = sel? +sel.value : null;
+    arr.push(v);
+    if(v!==null){ sum+=v; answered++; }
+  }
+  return {sum, answered, complete: answered===n, arr};
+}
+function phqSeverity(s){ if(s<=4)return'minimal (0\u20134)'; if(s<=9)return'mild (5\u20139)'; if(s<=14)return'moderate (10\u201314)'; if(s<=19)return'moderately severe (15\u201319)'; return'severe (20\u201327)'; }
+function gadSeverity(s){ if(s<=4)return'minimal (0\u20134)'; if(s<=9)return'mild (5\u20139)'; if(s<=14)return'moderate (10\u201314)'; return'severe (15\u201321)'; }
+function computeScores(){
+  const p=getScores('p',9), g=getScores('g',7);
+  $('#phq9score').textContent=p.sum; $('#gad7score').textContent=g.sum;
+  $('#phq9sev').textContent = p.answered? phqSeverity(p.sum) + (p.complete?'':' \u00b7 incomplete') : '';
+  $('#gad7sev').textContent = g.answered? gadSeverity(g.sum) + (g.complete?'':' \u00b7 incomplete') : '';
+}
+function collectAssess(){
+  const p=getScores('p',9), g=getScores('g',7);
+  return {
+    submission_id: nowStamp(),
+    entry_date: $('#a_date').value,
+    phq9_items: p.arr, phq9_total: p.sum, phq9_complete: p.complete,
+    gad7_items: g.arr, gad7_total: g.sum, gad7_complete: g.complete,
+    functional_difficulty: $('#a_difficulty').value
+  };
+}
+function saveAssess(){
+  if(!$('#a_date').value){ toast('Set an assessment date'); return; }
+  Store.put('assess', collectAssess());
+  toast('Assessment saved'); refreshDueBanner();
+}
+function resetAssess(){
+  $$('#seg-assess input[type=radio]').forEach(r=>r.checked=false);
+  $$('#seg-assess .opts label').forEach(l=>l.classList.remove('sel'));
+  $('#a_difficulty').value=''; $('#a_date').value=todayISO(); computeScores();
+}
+function refreshDueBanner(){
+  const all = Store.list('assess').slice().sort((a,b)=>b.entry_date.localeCompare(a.entry_date));
+  const banner=$('#dueBanner');
+  if(!all.length){ banner.className='due-banner'; banner.textContent='No assessment on record yet \u2014 the first one establishes your baseline.'; return; }
+  const last = all[0].entry_date;
+  const days = Math.floor((new Date(todayISO()) - new Date(last)) / 86400000);
+  if(days>=14){ banner.className='due-banner'; banner.textContent=`Due \u2014 last assessment ${days} days ago (${fmtDate(last)}). Biweekly target reached.`; }
+  else { banner.className='due-banner notdue'; banner.textContent=`Last assessment ${days} day${days===1?'':'s'} ago (${fmtDate(last)}). Next due in ${14-days} day${14-days===1?'':'s'}.`; }
+}
+
+/* ---------- MEDICATION ---------- */
+function fieldHTML(med, f, idx, ridx){
+  const id = `m_${med.id}_${ridx}_${f}`;
+  switch(f){
+    case 'time': return `<label class="fld"><span class="lab">Time</span><input type="time" id="${id}"></label>`;
+    case 'tablets': return `<label class="fld"><span class="lab">Tablets${med.mgPerTab?` (\u00d7${med.mgPerTab}mg)`:''}</span><input type="number" step="0.5" min="0" id="${id}"></label>`;
+    case 'withFood': return `<label class="fld"><span class="lab">With food</span><select id="${id}"><option value="">\u2014</option><option>Yes</option><option>No</option></select></label>`;
+    case 'effect': return `<label class="fld"><span class="lab">Follow-up body effect</span><input type="text" id="${id}" placeholder="e.g. palpitations / none"></label>`;
+    case 'substance': return `<label class="fld"><span class="lab">Substance</span><select id="${id}">${['<option value="">\u2014</option>'].concat((med.options||[]).map(o=>`<option>${o}</option>`)).join('')}</select></label>`;
+    case 'amount': return `<label class="fld"><span class="lab">Amount (rough)</span><input type="text" id="${id}" placeholder="e.g. a few puffs"></label>`;
+    case 'notes': return `<label class="fld"><span class="lab">Notes</span><input type="text" id="${id}"></label>`;
+    default: return '';
+  }
+}
+function doseRowHTML(med, ridx){
+  const inner = med.fields.map(f=>fieldHTML(med,f,0,ridx)).join('');
+  const rm = med.multi ? `<button class="btn-rm" onclick="this.closest('.dose-row').remove()">\u00d7</button>` : '';
+  // pair fields two-per-row where sensible
+  return `<div class="dose-row" data-med="${med.id}" data-ridx="${ridx}">${rm}${inner}</div>`;
+}
+function renderMeds(){
+  const c=$('#medContainer'); c.innerHTML='';
+  MED_TEMPLATES.forEach(med=>{
+    const block=document.createElement('div'); block.className='med-tmpl'; block.dataset.med=med.id;
+    block.innerHTML = `<div class="med-name">${med.name} <span style="color:var(--mid);font-weight:400;text-transform:none;letter-spacing:0">\u00b7 ${med.pattern}</span></div>
+      <div class="dose-host">${doseRowHTML(med,0)}</div>
+      ${med.multi?`<button class="btn-add" onclick="addDose('${med.id}')">+ add dose</button>`:''}`;
+    c.appendChild(block);
+  });
+}
+let doseCounters={};
+function addDose(medId){
+  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  doseCounters[medId]=(doseCounters[medId]||0)+1;
+  const host = document.querySelector(`.med-tmpl[data-med="${medId}"] .dose-host`);
+  const div=document.createElement('div'); div.innerHTML=doseRowHTML(med, doseCounters[medId]); host.appendChild(div.firstChild);
+}
+function collectMeds(){
+  const entries=[];
+  MED_TEMPLATES.forEach(med=>{
+    $$(`.dose-row[data-med="${med.id}"]`).forEach(row=>{
+      const ridx=row.dataset.ridx; const obj={medication:med.id, med_name:med.name};
+      let hasData=false;
+      med.fields.forEach(f=>{
+        const el=document.getElementById(`m_${med.id}_${ridx}_${f}`);
+        if(el && el.value!==''){ obj[f]=el.value; hasData=true; }
+      });
+      if(med.mgPerTab && obj.tablets) obj.mg = (+obj.tablets)*med.mgPerTab;
+      if(hasData) entries.push(obj);
+    });
+  });
+  return { submission_id: nowStamp(), entry_date: $('#m_date').value, backfilled: $('#m_date').value < todayISO(), entries };
+}
+function saveMeds(){
+  if(!$('#m_date').value){ toast('Set a log date'); return; }
+  const existing = Store.getByDate('meds', $('#m_date').value);
+  const rec = collectMeds();
+  if(existing) rec.submission_id = existing.submission_id;
+  Store.put('meds', rec);
+  toast(existing?'Medication log updated':'Medication log saved');
+}
+function resetMeds(){ doseCounters={}; renderMeds(); $('#m_date').value=todayISO(); }
+renderMeds();
+
+/* ---------- LOG ---------- */
+function renderLog(){
+  const all = Store.everything();
+  const byDate = {};
+  ['daily','assess','meds'].forEach(coll=>{
+    all[coll].forEach(r=>{ (byDate[r.entry_date]=byDate[r.entry_date]||{})[coll]=r; });
+  });
+  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const list=$('#logList');
+  if(!dates.length){ list.innerHTML='<div class="empty">No entries yet.</div>'; return; }
+  list.innerHTML = dates.map(date=>{
+    const e=byDate[date];
+    let valTag='';
+    if(e.daily && typeof e.daily.valence==='number'){ valTag = `valence ${e.daily.valence.toFixed(2)}`; }
+    else if(e.assess){ valTag = `PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`; }
+    else if(e.meds){ valTag = `${e.meds.entries.length} med entr${e.meds.entries.length===1?'y':'ies'}`; }
+    let body='<dl>';
+    if(e.daily){
+      const d=e.daily;
+      body+=`<dt>mood</dt><dd>${valWord(d.valence*100)} (${d.valence.toFixed(2)})</dd>`;
+      if(d.body_sensations&&d.body_sensations.length) body+=`<dt>body</dt><dd>${d.body_sensations.join(', ')}${d.body_tension_where?` · tension: ${d.body_tension_where}`:''}${d.body_other?` · ${d.body_other}`:''}</dd>`;
+      if(d.biological_fact) body+=`<dt>bio fact</dt><dd>${esc(d.biological_fact)}</dd>`;
+      if(d.note) body+=`<dt>note</dt><dd>${esc(d.note)}</dd>`;
+    }
+    if(e.assess){
+      const a=e.assess;
+      body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${phqSeverity(a.phq9_total)})${a.phq9_complete?'':' · incomplete'}</dd>`;
+      body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${gadSeverity(a.gad7_total)})${a.gad7_complete?'':' · incomplete'}</dd>`;
+      if(a.functional_difficulty) body+=`<dt>difficulty</dt><dd>${a.functional_difficulty}</dd>`;
+    }
+    if(e.meds && e.meds.entries.length){
+      const lines = e.meds.entries.map(m=>{
+        const parts=[m.med_name];
+        if(m.substance) parts.push(m.substance);
+        if(m.time) parts.push(m.time);
+        if(m.tablets) parts.push(`${m.tablets}tab${m.mg?` (${m.mg}mg)`:''}`);
+        if(m.amount) parts.push(m.amount);
+        if(m.withFood) parts.push(`food:${m.withFood}`);
+        if(m.effect) parts.push(`→ ${m.effect}`);
+        if(m.notes) parts.push(`(${m.notes})`);
+        return parts.join(' · ');
+      }).join('<br>');
+      body+=`<dt>meds</dt><dd>${lines}</dd>`;
+    }
+    body+='</dl>';
+    const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · backfilled' : '';
+    return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${valTag}</span></summary><div class="log-body">${body}</div></details>`;
+  }).join('');
+}
+function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ---------- EXPORT ---------- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(Store.everything(),null,2)],{type:'application/json'});
+  dl(blob, `monitor_export_${todayISO()}.json`);
+}
+function exportCSV(){
+  const all=Store.everything(); const rows=[['collection','entry_date','submission_id','field','value']];
+  ['daily','assess','meds'].forEach(coll=>all[coll].forEach(r=>{
+    Object.entries(r).forEach(([k,v])=>{
+      if(['entry_date','submission_id'].includes(k))return;
+      rows.push([coll, r.entry_date, r.submission_id, k, typeof v==='object'?JSON.stringify(v):v]);
+    });
+  }));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  dl(new Blob([csv],{type:'text/csv'}), `monitor_export_${todayISO()}.csv`);
+}
+function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+
+/* ---------- init ---------- */
+refreshDueBanner();
+</script>
+</body>
+</html>
