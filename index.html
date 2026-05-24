@@ -33,7 +33,6 @@ header.top {
   position: sticky; top: 0; background: var(--bg); z-index: 20;
 }
 .top-row { display: flex; align-items: baseline; justify-content: space-between; }
-.brand { font-family: var(--mono); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
 .header-right { display: flex; align-items: baseline; }
 .datestamp { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.05em; }
 
@@ -179,7 +178,7 @@ input[type=range].valence::-moz-range-thumb {
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <span class="brand" id="brandBtn" style="cursor:pointer;" title="Click to set Sync URL">— monitor —</span>
+      <span id="brandBtn" style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; letter-spacing:0.05em;" title="Click to set Sync URL">Endpoint URL</span>
       <div class="header-right">
         <span class="datestamp" id="todayStamp"></span>
         <span id="syncIndicator" style="font-size: 11px; margin-left: 10px; font-weight: 700;"></span>
@@ -718,6 +717,18 @@ function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add(
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+function extractTime(val) {
+  if (!val) return '';
+  if (/^\d{2}:\d{2}$/.test(val)) return val; 
+  if (val.includes('T')) {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+  }
+  return val;
+}
+
 function setToggle(inputId, val, btn){
   document.getElementById(inputId).value = val;
   btn.parentElement.querySelectorAll('.tyn').forEach(b => b.classList.remove('on'));
@@ -938,10 +949,10 @@ function loadDaily(date){
     });
     $('#d_body_tension').value = rec.body_tension_where || '';
     $('#d_body_other').value = rec.body_other || '';
-    if(rec.sleep_bedtime) $('#d_sleep_bedtime').value = rec.sleep_bedtime;
-    if(rec.sleep_onset) $('#d_sleep_onset').value = rec.sleep_onset;
+    if(rec.sleep_bedtime) $('#d_sleep_bedtime').value = extractTime(rec.sleep_bedtime);
+    if(rec.sleep_onset) $('#d_sleep_onset').value = extractTime(rec.sleep_onset);
     if(rec.sleep_wakes !== null && rec.sleep_wakes !== undefined) $('#d_sleep_wakes').value = rec.sleep_wakes;
-    if(rec.sleep_wake_time) $('#d_sleep_wake').value = rec.sleep_wake_time;
+    if(rec.sleep_wake_time) $('#d_sleep_wake').value = extractTime(rec.sleep_wake_time);
     if(rec.sleep_quality) $('#d_sleep_quality').value = rec.sleep_quality;
     $('#d_bio').value = rec.biological_fact || '';
     $('#d_note').value = rec.note || '';
@@ -1309,10 +1320,10 @@ function renderLog(){
       }
       if(d.sleep_bedtime || d.sleep_wake_time){
         let sleepTxt = '';
-        if(d.sleep_bedtime) sleepTxt += `bed ${esc(d.sleep_bedtime)}`;
-        if(d.sleep_onset) sleepTxt += ` → onset ~${esc(d.sleep_onset)}`;
+        if(d.sleep_bedtime) sleepTxt += `bed ${esc(extractTime(d.sleep_bedtime))}`;
+        if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
         if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
-        if(d.sleep_wake_time) sleepTxt += ` · up ${esc(d.sleep_wake_time)}`;
+        if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
         if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
         body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
       }
