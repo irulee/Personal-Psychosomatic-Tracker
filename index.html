@@ -160,7 +160,6 @@ input[type=range].valence::-moz-range-thumb {
 .footnote { font-size: 11px; color: var(--mid); line-height: 1.6; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
 .footnote code { background: var(--panel); padding: 1px 4px; border: 1px solid var(--line); }
 
-/* Toggle yes/no buttons (Task C) */
 .toggle-yn { display: flex; gap: 0; border: 1px solid var(--line-strong); }
 .tyn {
   flex: 1; background: var(--field); border: none; border-right: 1px solid var(--line-strong);
@@ -171,7 +170,6 @@ input[type=range].valence::-moz-range-thumb {
 .tyn:hover { background: #ece9e1; }
 .tyn.on { background: var(--ink); color: var(--bg); font-weight: 700; }
 
-/* Sleep section (Task A) */
 .zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
 .zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
 .zolon-caution { font-size: 10px; color: var(--mid); margin-top: 2px; letter-spacing: 0.01em; }
@@ -374,7 +372,6 @@ const Store = {
   _key: 'monitor_v1',
   get endpoint() { return localStorage.getItem('monitor_endpoint'); },
 
-  // --- CORE LOCAL READ/WRITE ---
   _all() {
     try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
     catch(e){ return {daily:[],assess:[],meds:[]}; }
@@ -404,7 +401,6 @@ const Store = {
     return n;
   },
 
-  // --- SYNC LOGIC ---
   put(coll, record) {
     const d = this._all();
     record._dirty = true;
@@ -432,18 +428,13 @@ const Store = {
         if (rec._dirty) {
           try {
             const payload = JSON.stringify({ collection: coll, record: rec });
-            console.log("Syncing payload:", payload);
-
             const res = await fetch(url, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-              },
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: payload
             });
 
             const textResult = await res.text();
-            console.log("GAS Response:", textResult);
             const result = JSON.parse(textResult);
 
             if (result.status === "success") {
@@ -463,7 +454,6 @@ const Store = {
     if (typeof updateSyncUI === 'function') updateSyncUI();
   },
 
-  // Convert a cloud-returned entry_date back to a plain local YYYY-MM-DD.
   _normalizeDate(val) {
     if (val === null || val === undefined || val === '') return val;
     const s = String(val);
@@ -482,7 +472,6 @@ const Store = {
     try {
       const res = await fetch(url + '?action=getAll');
       const textResult = await res.text();
-      console.log('Hydration response:', textResult);
       const data = JSON.parse(textResult);
       if (data.daily === undefined && data.assess === undefined && data.meds === undefined) return;
 
@@ -507,7 +496,6 @@ const Store = {
         meds: clean('meds', data.meds)
       };
 
-      // MERGE: cloud as base, unsynced local wins
       const local = this._all();
       const merged = {};
       ['daily', 'assess', 'meds'].forEach(coll => {
@@ -623,7 +611,6 @@ const I18N = {
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
-  // Sleep section (Task A)
   sleep_head:{en:'Sleep',zh:'睡眠'}, sleep_hint:{en:'previous night — all optional',zh:'前一夜 — 皆為選填'},
   sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep Onset (rough)',zh:'入睡時間（概估）'},
   sleep_wakes:{en:'Wake Count',zh:'醒來次數'}, sleep_wake_time:{en:'Wake Time',zh:'早晨醒來'},
@@ -632,7 +619,6 @@ const I18N = {
   sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
   sleep_zolon_none:{en:'—',zh:'—'},
   sleep_zolon_caution:{en:'Assumes doses before 4:00 AM belong to the previous night.',zh:'假設凌晨 4:00 前的劑量屬於前一夜。'},
-  // Body sensations
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
   'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
@@ -683,7 +669,7 @@ const GAD7_ITEMS_ZH = [
   "無法停止或者控制憂慮",
   "過分憂慮不同的事情",
   "難以放鬆",
-  "「心緒不寧以至坐立不安",
+  "心緒不寧以至坐立不安",
   "容易心煩或易怒",
   "感到害怕,就想要發生可怕的事情"
 ];
@@ -732,32 +718,41 @@ function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add(
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
-// Toggle helper for yes/no buttons (Task C)
 function setToggle(inputId, val, btn){
   document.getElementById(inputId).value = val;
   btn.parentElement.querySelectorAll('.tyn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
 }
 
-// Zolon auto-pull for sleep section — window-based lookup.
-// For daily date D, "previous night" = the sleep episode starting evening of D-1.
-// Window: [18:00 on D-1, 04:00 on D). Shows the most recent dose in that window.
-// Display-only — never modifies stored medication data.
+// -------------------------------------------------------------
+// SAFE CROSS-BROWSER DATE PARSING
+// iOS/Safari frequently returns 'Invalid Date' for "YYYY-MM-DDTHH:MM" 
+// without seconds. This helper forces manual parsing to eliminate NaN bugs.
+// -------------------------------------------------------------
+function parseLocalDatetime(isoStr) {
+  if (!isoStr) return null;
+  const parts = isoStr.split('T');
+  if (parts.length === 2) {
+    const dParts = parts[0].split('-').map(Number);
+    const tParts = parts[1].split(':').map(Number);
+    return new Date(
+      dParts[0],
+      dParts[1] - 1,
+      dParts[2],
+      tParts[0] || 0,
+      tParts[1] || 0,
+      tParts[2] || 0
+    );
+  }
+  return new Date(isoStr);
+}
+
 function resolveZolonDatetime(entry, recordEntryDate){
-  // New format: taken_at is a full local datetime "YYYY-MM-DDTHH:MM"
-  if(entry.taken_at) return new Date(entry.taken_at);
+  // New format (Task B): taken_at is a full local datetime "YYYY-MM-DDTHH:MM"
+  if(entry.taken_at) return parseLocalDatetime(entry.taken_at);
   // Legacy format: bare HH:MM + record's entry_date.
-  // Under the 4am cutoff, times 00:00–03:59 were logged on the previous calendar day,
-  // so the actual date is entry_date + 1.
   if(entry.time && recordEntryDate){
-    const hh = parseInt(entry.time.split(':')[0], 10);
-    if(hh < 4){
-      const d = new Date(recordEntryDate + 'T12:00:00');
-      d.setDate(d.getDate() + 1);
-      const actualDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      return new Date(actualDate + 'T' + entry.time);
-    }
-    return new Date(recordEntryDate + 'T' + entry.time);
+    return parseLocalDatetime(recordEntryDate + 'T' + entry.time);
   }
   return null;
 }
@@ -769,10 +764,12 @@ function getZolonForNight(dailyDate){
   const dObj = new Date(dailyDate + 'T12:00:00');
   const dMinus1 = new Date(dObj); dMinus1.setDate(dMinus1.getDate() - 1);
   const fmtD = s => `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
-  const windowStart = new Date(fmtD(dMinus1) + 'T18:00:00').getTime();
-  const windowEnd   = new Date(dailyDate + 'T04:00:00').getTime();
+  
+  // Using the safe parser to guarantee mathematical comparisons work across devices
+  const windowStart = parseLocalDatetime(fmtD(dMinus1) + 'T18:00:00').getTime();
+  const windowEnd   = parseLocalDatetime(dailyDate + 'T04:00:00').getTime();
 
-  // Candidate meds record dates: D-2, D-1, D (covers all possible record placements)
+  // Candidate meds record dates: D-2, D-1, D
   const dMinus2 = new Date(dObj); dMinus2.setDate(dMinus2.getDate() - 2);
   const candidateDates = [fmtD(dMinus2), fmtD(dMinus1), dailyDate];
 
@@ -786,7 +783,10 @@ function getZolonForNight(dailyDate){
       if(entry.medication !== 'zolon') return;
       const dt = resolveZolonDatetime(entry, recDate);
       if(!dt || isNaN(dt.getTime())) return;
+      
       const ts = dt.getTime();
+      
+      // If the parsed date safely sits within the 18:00 -> 04:00 window, surface it.
       if(ts >= windowStart && ts < windowEnd && ts > bestTime){
         best = { entry, datetime: dt };
         bestTime = ts;
@@ -810,7 +810,6 @@ function updateZolonDisplay(){
   let s = '';
   if(e.tablets) s += `${e.tablets}tab`;
   if(e.mg) s += ` (${e.mg}mg)`;
-  // Show the resolved time
   const dt = result.datetime;
   const timeStr = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
   s += ` @ ${timeStr}`;
@@ -897,7 +896,6 @@ function collectDaily(){
     body_sensations: body,
     body_tension_where: body.includes('Tension') ? $('#d_body_tension').value.trim() : '',
     body_other: body.includes('Other') ? $('#d_body_other').value.trim() : '',
-    // Sleep fields (Task A)
     sleep_bedtime: $('#d_sleep_bedtime').value || '',
     sleep_onset: $('#d_sleep_onset').value || '',
     sleep_wakes: $('#d_sleep_wakes').value !== '' ? +$('#d_sleep_wakes').value : null,
@@ -917,7 +915,6 @@ function clearDailyForm(){
   $$('#d_body .chip.on').forEach(c=>c.classList.remove('on'));
   $('#d_body_other').classList.remove('show'); $('#d_body_tension').classList.remove('show');
   $('#d_body_other').value=''; $('#d_body_tension').value='';
-  // Clear sleep fields
   $('#d_sleep_bedtime').value=''; $('#d_sleep_onset').value='';
   $('#d_sleep_wakes').value=''; $('#d_sleep_wake').value='';
   $('#d_sleep_quality').value='';
@@ -941,7 +938,6 @@ function loadDaily(date){
     });
     $('#d_body_tension').value = rec.body_tension_where || '';
     $('#d_body_other').value = rec.body_other || '';
-    // Load sleep fields
     if(rec.sleep_bedtime) $('#d_sleep_bedtime').value = rec.sleep_bedtime;
     if(rec.sleep_onset) $('#d_sleep_onset').value = rec.sleep_onset;
     if(rec.sleep_wakes !== null && rec.sleep_wakes !== undefined) $('#d_sleep_wakes').value = rec.sleep_wakes;
@@ -1154,7 +1150,6 @@ function clearMedQuickFields(){
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
     if(el) el.value = '';
   });
-  // Clear toggle button visual states
   $$('#med_quick_fields .tyn.on').forEach(b => b.classList.remove('on'));
 }
 
@@ -1197,7 +1192,6 @@ function logIntake(){
   if(!date){ toast(t('toast_set_log_date')); return; }
   const entry = collectQuickMedEntry();
   if(!entry){ toast(t('toast_fill_field')); return; }
-  // Dose validation (Task D)
   if(entry.tablets !== undefined){
     const tabs = +entry.tablets;
     if(isNaN(tabs) || tabs < 0 || tabs > 10){ toast(t('toast_invalid_dose')); return; }
@@ -1313,7 +1307,6 @@ function renderLog(){
           + (d.body_other ? ` · ${esc(d.body_other)}` : '');
         body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
       }
-      // Sleep in log (Task A)
       if(d.sleep_bedtime || d.sleep_wake_time){
         let sleepTxt = '';
         if(d.sleep_bedtime) sleepTxt += `bed ${esc(d.sleep_bedtime)}`;
