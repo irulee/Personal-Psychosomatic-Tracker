@@ -457,9 +457,12 @@ const Store = {
             if (result.status === "success") {
               rec._dirty = false;
               updated = true;
+              _syncError = false;
             }
           } catch (e) {
             console.error("Sync failed for record", rec.submission_id, e);
+            _syncError = true;
+            toast(t('toast_sync_error'));
           } finally {
             if (typeof updateSyncUI === 'function') updateSyncUI();
           }
@@ -487,6 +490,7 @@ const Store = {
     if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._hydrateFromSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
+    _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
       const res = await fetch(url + '?action=getAll');
       const textResult = await res.text();
@@ -534,32 +538,43 @@ const Store = {
       }
     } catch (e) {
       console.error('Hydration failed', e);
+    } finally {
+      _hydrating = false; if (typeof updateSyncUI === 'function') updateSyncUI();
     }
   },
 
   async _syncToSheets() {
     if (!navigator.onLine) { if (typeof updateSyncUI === 'function') updateSyncUI(); return; }
-    const d = this._all();
-    let updated = false;
-    for (const coll of ['daily','assess','meds']) {
-      if (!d[coll].some(r => r._dirty)) continue;
-      try {
-        const clean = d[coll].map(r => { const c = Object.assign({}, r); delete c._dirty; return c; });
-        await SheetsSync.write(coll, clean);
-        d[coll].forEach(r => { r._dirty = false; });
-        updated = true;
-      } catch(e) {
-        console.error('Sheets sync failed for ' + coll, e);
-      } finally {
-        if (typeof updateSyncUI === 'function') updateSyncUI();
+    if (!_claimSyncLock()) return;
+    try {
+      const d = this._all();
+      let updated = false;
+      for (const coll of ['daily','assess','meds']) {
+        if (!d[coll].some(r => r._dirty)) continue;
+        try {
+          const clean = d[coll].map(r => { const c = Object.assign({}, r); delete c._dirty; return c; });
+          await SheetsSync.write(coll, clean);
+          d[coll].forEach(r => { r._dirty = false; });
+          updated = true;
+          _syncError = false;
+        } catch(e) {
+          console.error('Sheets sync failed for ' + coll, e);
+          _syncError = true;
+          toast(t('toast_sync_error'));
+        } finally {
+          if (typeof updateSyncUI === 'function') updateSyncUI();
+        }
       }
+      if (updated) this._commit(d);
+      if (typeof updateSyncUI === 'function') updateSyncUI();
+    } finally {
+      _releaseSyncLock();
     }
-    if (updated) this._commit(d);
-    if (typeof updateSyncUI === 'function') updateSyncUI();
   },
 
   async _hydrateFromSheets() {
     if (!navigator.onLine) return;
+    _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
       await SheetsSync.ensure();
       const cloud = {};
@@ -603,9 +618,37 @@ const Store = {
       }
     } catch(e) {
       console.error('Sheets hydration failed', e);
+    } finally {
+      _hydrating = false; if (typeof updateSyncUI === 'function') updateSyncUI();
     }
   }
 };
+
+// ---- Sync state ----
+let _syncError = false;
+let _hydrating = false;
+const _TAB_ID = Math.random().toString(36).slice(2);
+const _SYNC_LOCK_KEY = 'monitor_sync_lock';
+const _SYNC_LOCK_TTL = 30000;
+
+function _claimSyncLock() {
+  try {
+    const raw = localStorage.getItem(_SYNC_LOCK_KEY);
+    if (raw) {
+      const lock = JSON.parse(raw);
+      if (lock.tab !== _TAB_ID && Date.now() - lock.ts < _SYNC_LOCK_TTL) return false;
+    }
+  } catch(e) {}
+  localStorage.setItem(_SYNC_LOCK_KEY, JSON.stringify({ tab: _TAB_ID, ts: Date.now() }));
+  return true;
+}
+
+function _releaseSyncLock() {
+  try {
+    const raw = localStorage.getItem(_SYNC_LOCK_KEY);
+    if (raw) { const lock = JSON.parse(raw); if (lock.tab === _TAB_ID) localStorage.removeItem(_SYNC_LOCK_KEY); }
+  } catch(e) {}
+}
 
 // ---- Google Auth (GIS) ----
 const GOOGLE_CLIENT_ID = '576293248913-oddfuaq3qic51hr92fdjmpq43sr60hpr.apps.googleusercontent.com';
@@ -614,6 +657,7 @@ const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file email';
 const GoogleAuth = {
   token: null,
   tokenClient: null,
+  tokenExpiry: null,
   userEmail: null,
   _refreshResolve: null,
 
@@ -634,6 +678,7 @@ const GoogleAuth = {
       return;
     }
     this.token = resp.access_token;
+    this.tokenExpiry = Date.now() + ((resp.expires_in || 3600) * 1000);
     this._fetchEmail();
     if (this._refreshResolve) {
       this._refreshResolve();
@@ -670,6 +715,7 @@ const GoogleAuth = {
   signOut() {
     if (this.token) { try { google.accounts.oauth2.revoke(this.token); } catch(e) {} }
     this.token = null;
+    this.tokenExpiry = null;
     this.userEmail = null;
     localStorage.removeItem('monitor_auth_mode');
     localStorage.removeItem('monitor_auth_email');
@@ -682,6 +728,12 @@ const GoogleAuth = {
 
   async authFetch(url, opts) {
     if (!this.token) throw new Error('Not signed in');
+    // Proactive token refresh if expiry is within 5 minutes
+    if (this.tokenExpiry && Date.now() > this.tokenExpiry - 300000) {
+      var savedToken = this.token;
+      try { await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this)); }
+      catch(e) { if (!this.token) this.token = savedToken; }
+    }
     opts = opts || {};
     opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + this.token });
     var res = await fetch(url, opts);
@@ -806,7 +858,9 @@ function syncLabel(key, vars){
     synced: { en: '[ Synced ]', zh: '[ 已同步 ]' },
     syncing: { en: '[ Syncing: {n} pending ]', zh: '[ 同步中：{n} 待傳 ]' },
     offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' },
-    local: { en: '[ Local only ]', zh: '[ 僅本機 ]' }
+    local: { en: '[ Local only ]', zh: '[ 僅本機 ]' },
+    error: { en: '[ Sync error ]', zh: '[ 同步錯誤 ]' },
+    hydrating: { en: '[ Loading… ]', zh: '[ 載入中… ]' }
   };
   let s = (L[key] && (L[key][currentLang] || L[key].en)) || key;
   if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
@@ -816,12 +870,20 @@ function syncLabel(key, vars){
 function updateSyncUI(){
   const el = $('#syncIndicator');
   if(!el) return;
+  if(_hydrating){
+    el.textContent = syncLabel('hydrating');
+    el.style.color = 'var(--pos)';
+    return;
+  }
   const n = Store.countDirty();
   const isGoogle = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
   const hasBackend = isGoogle || Store.endpoint;
   if(!hasBackend){
     el.textContent = syncLabel('local');
     el.style.color = 'var(--mid)';
+  } else if(_syncError){
+    el.textContent = syncLabel('error');
+    el.style.color = 'var(--neg)';
   } else if(n === 0){
     el.textContent = syncLabel('synced');
     el.style.color = 'var(--mid)';
@@ -913,6 +975,7 @@ const I18N = {
   toast_assess_saved:{en:'Assessment saved',zh:'評估已儲存'}, toast_assess_updated:{en:'Assessment updated',zh:'評估已更新'},
   toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
   toast_invalid_dose:{en:'Invalid dose (0–10 tablets)',zh:'無效劑量（0–10 錠）'},
+  toast_sync_error:{en:'Sync error — will retry',zh:'同步錯誤 — 將重試'},
   daily_sub_onfile:{en:'entry on file for {date} — save will update',zh:'{date} 已有紀錄 — 儲存將更新'},
   assess_sub_onfile:{en:'assessment on file for {date} — save will update',zh:'{date} 已有評估 — 儲存將更新'},
   meds_sub_onfile:{en:'{n} intake(s) on file for {date}',zh:'{date} 已有 {n} 筆服用紀錄'},
@@ -1030,7 +1093,7 @@ function todayISO(){
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function nowStamp(){ return new Date().toISOString(); }
+function nowStamp(){ return new Date().toISOString() + '-' + Math.random().toString(36).slice(2,6); }
 function nowLocalDatetime(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -1699,7 +1762,11 @@ function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createOb
 
 $('#brandBtn').addEventListener('click', ()=>{
   const url = prompt('Enter Google Apps Script Sync URL:');
-  if(url) localStorage.setItem('monitor_endpoint', url.trim());
+  if(url){
+    const trimmed = url.trim();
+    if(!/^https:\/\/.+/.test(trimmed)){ toast('URL must start with https://'); return; }
+    localStorage.setItem('monitor_endpoint', trimmed);
+  }
   updateSyncUI();
   Store.hydrateFromCloud();
   Store.syncQueue();
