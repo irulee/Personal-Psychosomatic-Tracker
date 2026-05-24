@@ -563,9 +563,20 @@ const Store = {
     try {
       await SheetsSync.ensure();
       const cloud = {};
+      let cloudEmpty = true;
       for (const coll of ['daily','assess','meds']) {
         cloud[coll] = await SheetsSync.read(coll);
+        if (cloud[coll].length > 0) cloudEmpty = false;
       }
+
+      // First sync: cloud is empty, push local data up
+      if (cloudEmpty) {
+        await this._syncToSheets();
+        if (typeof updateSyncUI === 'function') updateSyncUI();
+        return;
+      }
+
+      // Normal merge: cloud as base, local dirty wins
       const local = this._all();
       const merged = {};
       ['daily','assess','meds'].forEach(coll => {
@@ -581,7 +592,14 @@ const Store = {
       const after = JSON.stringify(merged);
       if (before !== after) {
         this._commit(merged);
-        location.reload();
+        // Re-render in place (no page reload — preserves Google auth token)
+        rebuildAssessItems();
+        loadDaily($('#d_date').value || todayISO());
+        loadAssess($('#a_date').value || todayISO());
+        loadMeds($('#m_date').value || todayISO());
+        refreshDueBanner();
+        updateSyncUI();
+        renderI18n();
       }
     } catch(e) {
       console.error('Sheets hydration failed', e);
@@ -633,13 +651,15 @@ const GoogleAuth = {
       var r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': 'Bearer ' + this.token }
       });
-      if (r.ok) { var info = await r.json(); this.userEmail = info.email || null; updateAuthUI(); }
+      if (r.ok) { var info = await r.json(); this.userEmail = info.email || null; if(this.userEmail) localStorage.setItem('monitor_auth_email', this.userEmail); updateAuthUI(); }
     } catch(e) {}
   },
 
   signIn() {
+    if (!this.tokenClient) this.init();
     if (!this.tokenClient) { toast('Google Sign-In not available'); return; }
-    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    var isReturning = localStorage.getItem('monitor_auth_mode') === 'google';
+    this.tokenClient.requestAccessToken({ prompt: isReturning ? '' : 'consent' });
   },
 
   trySilentSignIn() {
@@ -652,6 +672,7 @@ const GoogleAuth = {
     this.token = null;
     this.userEmail = null;
     localStorage.removeItem('monitor_auth_mode');
+    localStorage.removeItem('monitor_auth_email');
     localStorage.removeItem('monitor_sheets_id');
     updateAuthUI();
     updateSyncUI();
@@ -830,7 +851,15 @@ function updateAuthUI(){
   } else {
     if(brandBtn) brandBtn.style.display = '';
     if(sep) sep.style.display = '';
-    if(signInBtn) signInBtn.style.display = '';
+    if(signInBtn){
+      signInBtn.style.display = '';
+      var savedEmail = localStorage.getItem('monitor_auth_email');
+      if(savedEmail && localStorage.getItem('monitor_auth_mode') === 'google'){
+        signInBtn.textContent = savedEmail;
+      } else {
+        signInBtn.textContent = t('auth_signin');
+      }
+    }
     if(userArea) userArea.style.display = 'none';
   }
 }
@@ -1687,9 +1716,6 @@ function _waitForGIS(){
   if(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2){
     GoogleAuth.init();
     updateAuthUI();
-    if(localStorage.getItem('monitor_auth_mode') === 'google'){
-      GoogleAuth.trySilentSignIn();
-    }
   } else if(++_gisAttempts < 25){
     setTimeout(_waitForGIS, 200);
   }
