@@ -199,7 +199,7 @@ input[type=range].valence::-moz-range-thumb {
 <main class="wrap">
 
 <section class="seg active" id="seg-daily">
-  <div class="seg-head" data-i18n="daily_head">Daily entry</div>
+  <div class="seg-head" data-i18n="daily_head">Daily Entry</div>
   <div class="seg-sub" id="dailySub" data-i18n="daily_sub">mood · body · biological fact · note</div>
 
   <label class="fld">
@@ -264,7 +264,7 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="block">
-    <div class="block-title"><span data-i18n="bio_fact">Biological Facts</span> <span class="hint" data-i18n="bio_hint">ate / slept / pain / etc.</span></div>
+    <div class="block-title"><span data-i18n="bio_fact">Biological fact</span> <span class="hint" data-i18n="bio_hint">ate / slept / pain / etc.</span></div>
     <textarea id="d_bio" data-i18n-placeholder="bio_placeholder" placeholder="one concrete bodily fact, if any"></textarea>
   </div>
 
@@ -274,7 +274,7 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="actions">
-    <button type="button" id="btn_save_daily" class="btn-primary" onclick="saveDaily()" data-i18n="save_entry">Save entry</button>
+    <button type="button" id="btn_save_daily" class="btn-primary" onclick="saveDaily()" data-i18n="save_entry">Save Entry</button>
     <button type="button" class="btn-ghost" onclick="resetDaily()" data-i18n="clear">Clear</button>
   </div>
 </section>
@@ -568,7 +568,7 @@ let currentLang = 'en';
 
 const I18N = {
   tab_daily:{en:'Daily',zh:'每日'}, tab_assess:{en:'Assessment',zh:'評估'}, tab_meds:{en:'Medication',zh:'用藥'}, tab_log:{en:'Log',zh:'紀錄'},
-  daily_head:{en:'Daily entry',zh:'每日紀錄'}, daily_sub:{en:'mood · body · biological fact · note',zh:'情緒 · 身體 · 生理事實 · 備註'},
+  daily_head:{en:'Daily Entry',zh:'每日紀錄'}, daily_sub:{en:'mood · body · biological fact · note',zh:'情緒 · 身體 · 生理事實 · 備註'},
   entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
   val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
   body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
@@ -577,7 +577,7 @@ const I18N = {
   bio_placeholder:{en:'one concrete bodily fact, if any',zh:'一項具體的身體事實（若有）'},
   note:{en:'Note',zh:'備註'}, note_hint:{en:'optional',zh:'選填'},
   note_placeholder:{en:'anything worth keeping — a thought, a moment, a line to your future self',zh:'值得留下的任何事 — 念頭、片刻、給未來自己的一句話'},
-  save_entry:{en:'Save entry',zh:'儲存紀錄'}, saving:{en:'Saving...',zh:'儲存中…'}, clear:{en:'Clear',zh:'清除'},
+  save_entry:{en:'Save Entry',zh:'儲存紀錄'}, saving:{en:'Saving...',zh:'儲存中…'}, clear:{en:'Clear',zh:'清除'},
   assess_head:{en:'Assessment',zh:'評估'}, assess_sub:{en:'PHQ-9 & GAD-7 · biweekly',zh:'PHQ-9 與 GAD-7 · 雙週'},
   assess_date:{en:'Assessment date',zh:'評估日期'}, over_2_weeks:{en:'over the last 2 weeks',zh:'過去兩週'},
   phq9_total:{en:'PHQ-9 total',zh:'PHQ-9 總分'}, gad7_total:{en:'GAD-7 total',zh:'GAD-7 總分'},
@@ -602,7 +602,7 @@ const I18N = {
   ledger_empty:{en:'No intakes logged for this date.',zh:'此日期尚無服用紀錄。'},
   toast_set_entry_date:{en:'Set an entry date',zh:'請設定紀錄日期'}, toast_set_assess_date:{en:'Set an assessment date',zh:'請設定評估日期'},
   toast_set_log_date:{en:'Set a log date',zh:'請設定紀錄日期'}, toast_fill_field:{en:'Fill at least one field',zh:'請至少填寫一項'},
-  toast_daily_saved:{en:'Daily entry saved',zh:'每日紀錄已儲存'}, toast_daily_updated:{en:'Daily entry updated',zh:'每日紀錄已更新'},
+  toast_daily_saved:{en:'Daily Entry saved',zh:'每日紀錄已儲存'}, toast_daily_updated:{en:'Daily Entry updated',zh:'每日紀錄已更新'},
   toast_assess_saved:{en:'Assessment saved',zh:'評估已儲存'}, toast_assess_updated:{en:'Assessment updated',zh:'評估已更新'},
   toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
   toast_invalid_dose:{en:'Invalid dose (0–10 tablets)',zh:'無效劑量（0–10 錠）'},
@@ -623,9 +623,9 @@ const I18N = {
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
   // Sleep section (Task A)
   sleep_head:{en:'Sleep',zh:'睡眠'}, sleep_hint:{en:'previous night — all optional',zh:'前一夜 — 皆為選填'},
-  sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep onset (rough)',zh:'入睡時間（概估）'},
-  sleep_wakes:{en:'Wake count',zh:'醒來次數'}, sleep_wake_time:{en:'Morning wake',zh:'早晨醒來'},
-  sleep_quality_label:{en:'Quality (optional)',zh:'品質（選填）'},
+  sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep Onset (rough)',zh:'入睡時間（概估）'},
+  sleep_wakes:{en:'Wake Count',zh:'醒來次數'}, sleep_wake_time:{en:'Wake Time',zh:'早晨醒來'},
+  sleep_quality_label:{en:'Sleep Quality (optional)',zh:'品質（選填）'},
   sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'OK',zh:'可以'}, sq_good:{en:'Good',zh:'好'},
   sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
   sleep_zolon_none:{en:'none logged',zh:'無紀錄'},
