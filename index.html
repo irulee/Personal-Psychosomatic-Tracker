@@ -174,6 +174,7 @@ input[type=range].valence::-moz-range-thumb {
 /* Sleep section (Task A) */
 .zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
 .zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
+.zolon-caution { font-size: 10px; color: var(--mid); margin-top: 2px; letter-spacing: 0.01em; }
 </style>
 </head>
 <body>
@@ -261,6 +262,7 @@ input[type=range].valence::-moz-range-thumb {
       </select>
     </label>
     <div class="zolon-auto" id="d_sleep_zolon"></div>
+    <div class="zolon-caution" data-i18n="sleep_zolon_caution">Assumes doses before 4:00 AM belong to the previous night.</div>
   </div>
 
   <div class="block">
@@ -628,7 +630,8 @@ const I18N = {
   sleep_quality_label:{en:'Sleep Quality (optional)',zh:'品質（選填）'},
   sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'OK',zh:'可以'}, sq_good:{en:'Good',zh:'好'},
   sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
-  sleep_zolon_none:{en:'none logged',zh:'無紀錄'},
+  sleep_zolon_none:{en:'—',zh:'—'},
+  sleep_zolon_caution:{en:’Assumes doses before 4:00 AM belong to the previous night.’,zh:’假設凌晨 4:00 前的劑量屬於前一夜。’},
   // Body sensations
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
@@ -736,39 +739,82 @@ function setToggle(inputId, val, btn){
   btn.classList.add('on');
 }
 
-// Zolon auto-pull for sleep section (Task A)
+// Zolon auto-pull for sleep section — window-based lookup.
+// For daily date D, "previous night" = the sleep episode starting evening of D-1.
+// Window: [18:00 on D-1, 04:00 on D). Shows the most recent dose in that window.
+// Display-only — never modifies stored medication data.
+function resolveZolonDatetime(entry, recordEntryDate){
+  // New format: taken_at is a full local datetime "YYYY-MM-DDTHH:MM"
+  if(entry.taken_at) return new Date(entry.taken_at);
+  // Legacy format: bare HH:MM + record's entry_date.
+  // Under the 4am cutoff, times 00:00–03:59 were logged on the previous calendar day,
+  // so the actual date is entry_date + 1.
+  if(entry.time && recordEntryDate){
+    const hh = parseInt(entry.time.split(':')[0], 10);
+    if(hh < 4){
+      const d = new Date(recordEntryDate + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      const actualDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return new Date(actualDate + 'T' + entry.time);
+    }
+    return new Date(recordEntryDate + 'T' + entry.time);
+  }
+  return null;
+}
+
 function getZolonForNight(dailyDate){
   if(!dailyDate) return null;
-  // For daily date D, "previous night" Zolon is in meds record for D-1
-  // (4am cutoff assigns late-night intakes to the prior day)
-  const d = new Date(dailyDate + 'T12:00:00');
-  d.setDate(d.getDate() - 1);
-  const prevDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const rec = Store.getByDate('meds', prevDate);
-  if(!rec || !rec.entries) return null;
-  const zolonEntries = rec.entries.filter(e => e.medication === 'zolon');
-  if(!zolonEntries.length) return null;
-  return zolonEntries;
+
+  // Window: 18:00 on (D-1) through 04:00 on D (local time)
+  const dObj = new Date(dailyDate + 'T12:00:00');
+  const dMinus1 = new Date(dObj); dMinus1.setDate(dMinus1.getDate() - 1);
+  const fmtD = s => `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
+  const windowStart = new Date(fmtD(dMinus1) + 'T18:00:00').getTime();
+  const windowEnd   = new Date(dailyDate + 'T04:00:00').getTime();
+
+  // Candidate meds record dates: D-2, D-1, D (covers all possible record placements)
+  const dMinus2 = new Date(dObj); dMinus2.setDate(dMinus2.getDate() - 2);
+  const candidateDates = [fmtD(dMinus2), fmtD(dMinus1), dailyDate];
+
+  let best = null;
+  let bestTime = -Infinity;
+
+  candidateDates.forEach(recDate => {
+    const rec = Store.getByDate('meds', recDate);
+    if(!rec || !rec.entries) return;
+    rec.entries.forEach(entry => {
+      if(entry.medication !== 'zolon') return;
+      const dt = resolveZolonDatetime(entry, recDate);
+      if(!dt || isNaN(dt.getTime())) return;
+      const ts = dt.getTime();
+      if(ts >= windowStart && ts < windowEnd && ts > bestTime){
+        best = { entry, datetime: dt };
+        bestTime = ts;
+      }
+    });
+  });
+
+  return best;
 }
 
 function updateZolonDisplay(){
   const host = $('#d_sleep_zolon');
   if(!host) return;
   const date = $('#d_date').value;
-  const entries = getZolonForNight(date);
-  if(!entries){
+  const result = getZolonForNight(date);
+  if(!result){
     host.innerHTML = `<span>${t('sleep_zolon_label')}</span> ${t('sleep_zolon_none')}`;
     return;
   }
-  const parts = entries.map(e => {
-    let s = '';
-    if(e.tablets) s += `${e.tablets}tab`;
-    if(e.mg) s += ` (${e.mg}mg)`;
-    if(e.taken_at) s += ` @ ${e.taken_at.replace('T',' ')}`;
-    else if(e.time) s += ` @ ${e.time}`;
-    return s.trim();
-  });
-  host.innerHTML = `<span>${t('sleep_zolon_label')}</span> <span class="zolon-val">${esc(parts.join('; '))}</span>`;
+  const e = result.entry;
+  let s = '';
+  if(e.tablets) s += `${e.tablets}tab`;
+  if(e.mg) s += ` (${e.mg}mg)`;
+  // Show the resolved time
+  const dt = result.datetime;
+  const timeStr = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  s += ` @ ${timeStr}`;
+  host.innerHTML = `<span>${t('sleep_zolon_label')}</span> <span class="zolon-val">${esc(s.trim())}</span>`;
 }
 
 function renderI18n(){
