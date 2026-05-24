@@ -172,13 +172,30 @@ input[type=range].valence::-moz-range-thumb {
 .zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
 .zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
 .zolon-caution { font-size: 10px; color: var(--mid); margin-top: 2px; letter-spacing: 0.01em; }
+
+.auth-area { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.auth-sep { font-size: 10px; color: var(--mid); letter-spacing: 0.03em; }
+.auth-user { font-size: 11px; color: var(--ink-soft); display: flex; align-items: baseline; gap: 6px; }
+.btn-signout { background: none; border: none; font-family: var(--mono); font-size: 10px; color: var(--mid); text-decoration: underline; cursor: pointer; padding: 0; letter-spacing: 0.03em; }
+.btn-signout:hover { color: var(--ink); }
+.btn-signin { background: var(--field); border: 1px solid var(--line-strong); padding: 4px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; letter-spacing: 0.03em; }
+.btn-signin:hover { background: var(--ink); color: var(--bg); }
 </style>
+<script src="https://accounts.google.com/gsi/client" async></script>
 </head>
 <body>
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <span id="brandBtn" style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; letter-spacing:0.05em;" title="Click to set Sync URL">Endpoint URL</span>
+      <div class="auth-area">
+        <span id="brandBtn" style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; letter-spacing:0.05em;" title="Click to set Sync URL" data-i18n="auth_endpoint">Endpoint URL</span>
+        <span id="authSep" class="auth-sep" data-i18n="auth_or">or</span>
+        <button type="button" id="googleSignIn" class="btn-signin" data-i18n="auth_signin">Sign in with Google</button>
+        <span id="googleUser" class="auth-user" style="display:none;">
+          <span id="googleEmail"></span>
+          <button type="button" id="googleSignOut" class="btn-signout" data-i18n="auth_signout">Sign out</button>
+        </span>
+      </div>
       <div class="header-right">
         <span class="datestamp" id="todayStamp"></span>
         <span id="syncIndicator" style="font-size: 11px; margin-left: 10px; font-weight: 700;"></span>
@@ -412,6 +429,7 @@ const Store = {
   },
 
   async syncQueue() {
+    if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._syncToSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) {
       if (typeof updateSyncUI === 'function') updateSyncUI();
@@ -466,6 +484,7 @@ const Store = {
   },
 
   async hydrateFromCloud() {
+    if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._hydrateFromSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
     try {
@@ -516,6 +535,248 @@ const Store = {
     } catch (e) {
       console.error('Hydration failed', e);
     }
+  },
+
+  async _syncToSheets() {
+    if (!navigator.onLine) { if (typeof updateSyncUI === 'function') updateSyncUI(); return; }
+    const d = this._all();
+    let updated = false;
+    for (const coll of ['daily','assess','meds']) {
+      if (!d[coll].some(r => r._dirty)) continue;
+      try {
+        const clean = d[coll].map(r => { const c = Object.assign({}, r); delete c._dirty; return c; });
+        await SheetsSync.write(coll, clean);
+        d[coll].forEach(r => { r._dirty = false; });
+        updated = true;
+      } catch(e) {
+        console.error('Sheets sync failed for ' + coll, e);
+      } finally {
+        if (typeof updateSyncUI === 'function') updateSyncUI();
+      }
+    }
+    if (updated) this._commit(d);
+    if (typeof updateSyncUI === 'function') updateSyncUI();
+  },
+
+  async _hydrateFromSheets() {
+    if (!navigator.onLine) return;
+    try {
+      await SheetsSync.ensure();
+      const cloud = {};
+      for (const coll of ['daily','assess','meds']) {
+        cloud[coll] = await SheetsSync.read(coll);
+      }
+      const local = this._all();
+      const merged = {};
+      ['daily','assess','meds'].forEach(coll => {
+        const bySub = {};
+        (cloud[coll] || []).forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
+        (local[coll] || []).forEach(r => {
+          if (r && r._dirty && r.submission_id) bySub[r.submission_id] = r;
+        });
+        merged[coll] = Object.values(bySub).sort((a, b) =>
+          String(a.submission_id).localeCompare(String(b.submission_id)));
+      });
+      const before = JSON.stringify(this._all());
+      const after = JSON.stringify(merged);
+      if (before !== after) {
+        this._commit(merged);
+        location.reload();
+      }
+    } catch(e) {
+      console.error('Sheets hydration failed', e);
+    }
+  }
+};
+
+// ---- Google Auth (GIS) ----
+const GOOGLE_CLIENT_ID = '576293248913-oddfuaq3qic51hr92fdjmpq43sr60hpr.apps.googleusercontent.com';
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file email';
+
+const GoogleAuth = {
+  token: null,
+  tokenClient: null,
+  userEmail: null,
+  _refreshResolve: null,
+
+  init() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
+    this.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_SCOPE,
+      callback: (resp) => this._onToken(resp)
+    });
+  },
+
+  _onToken(resp) {
+    if (resp.error) {
+      this.token = null;
+      if (this._refreshResolve) { this._refreshResolve(); this._refreshResolve = null; }
+      updateAuthUI();
+      return;
+    }
+    this.token = resp.access_token;
+    this._fetchEmail();
+    if (this._refreshResolve) {
+      this._refreshResolve();
+      this._refreshResolve = null;
+    } else {
+      localStorage.setItem('monitor_auth_mode', 'google');
+      updateAuthUI();
+      updateSyncUI();
+      Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+    }
+  },
+
+  async _fetchEmail() {
+    try {
+      var r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + this.token }
+      });
+      if (r.ok) { var info = await r.json(); this.userEmail = info.email || null; updateAuthUI(); }
+    } catch(e) {}
+  },
+
+  signIn() {
+    if (!this.tokenClient) { toast('Google Sign-In not available'); return; }
+    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+  },
+
+  trySilentSignIn() {
+    if (!this.tokenClient) return;
+    try { this.tokenClient.requestAccessToken({ prompt: '' }); } catch(e) {}
+  },
+
+  signOut() {
+    if (this.token) { try { google.accounts.oauth2.revoke(this.token); } catch(e) {} }
+    this.token = null;
+    this.userEmail = null;
+    localStorage.removeItem('monitor_auth_mode');
+    localStorage.removeItem('monitor_sheets_id');
+    updateAuthUI();
+    updateSyncUI();
+  },
+
+  get isSignedIn() { return !!this.token; },
+
+  async authFetch(url, opts) {
+    if (!this.token) throw new Error('Not signed in');
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + this.token });
+    var res = await fetch(url, opts);
+    if (res.status === 401) {
+      await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this));
+      if (!this.token) throw new Error('Token refresh failed');
+      opts.headers['Authorization'] = 'Bearer ' + this.token;
+      res = await fetch(url, opts);
+    }
+    return res;
+  }
+};
+
+// ---- Sheets API Sync ----
+const SheetsSync = {
+  SCHEMA: {
+    daily: ['submission_id','entry_date','backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
+    assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
+    meds: ['submission_id','entry_date','backfilled','entries']
+  },
+  JSON_FIELDS: { daily:['body_sensations'], assess:['phq9_items','gad7_items'], meds:['entries'] },
+  NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
+  BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
+  NULLABLE: ['sleep_wakes'],
+  BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
+
+  get id() { return localStorage.getItem('monitor_sheets_id'); },
+  set id(v) { localStorage.setItem('monitor_sheets_id', v); },
+
+  _col: function(n) { var s=''; while(n>0){ n--; s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26); } return s; },
+
+  _ensuring: null,
+  async ensure() {
+    if (this._ensuring) return this._ensuring;
+    this._ensuring = this._doEnsure();
+    try { return await this._ensuring; } finally { this._ensuring = null; }
+  },
+
+  async _doEnsure() {
+    if (this.id) {
+      try {
+        var r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId');
+        if (r.ok) return this.id;
+      } catch(e) {}
+      localStorage.removeItem('monitor_sheets_id');
+    }
+    var body = {
+      properties: { title: 'PPT Monitor Data' },
+      sheets: ['daily','assess','meds'].map(function(name) {
+        return {
+          properties: { title: name },
+          data: [{ startRow:0, startColumn:0, rowData:[{
+            values: SheetsSync.SCHEMA[name].map(function(h) { return { userEnteredValue: { stringValue: h } }; })
+          }] }]
+        };
+      })
+    };
+    var r2 = await GoogleAuth.authFetch(this.BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r2.ok) throw new Error('Create spreadsheet failed: ' + r2.status);
+    var data = await r2.json();
+    this.id = data.spreadsheetId;
+    return this.id;
+  },
+
+  async read(sheet) {
+    if (!this.id) return [];
+    var cols = this.SCHEMA[sheet].length;
+    var r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(cols));
+    if (!r.ok) return [];
+    var data = await r.json();
+    var rows = data.values || [];
+    if (rows.length < 2) return [];
+    var schema = this.SCHEMA[sheet];
+    var jf = this.JSON_FIELDS[sheet] || [];
+    var self = this;
+    return rows.slice(1).map(function(row) {
+      var obj = {};
+      schema.forEach(function(f, i) {
+        var v = i < row.length ? row[i] : '';
+        if (jf.indexOf(f) >= 0 && typeof v === 'string' && v) { try { v = JSON.parse(v); } catch(e){} }
+        else if (self.BOOLEAN.indexOf(f) >= 0) { v = v === 'true'; }
+        else if (self.NUMERIC.indexOf(f) >= 0) {
+          if (v === '' || v === 'null') v = self.NULLABLE.indexOf(f) >= 0 ? null : 0;
+          else { var n = Number(v); v = isNaN(n) ? v : n; }
+        }
+        else if (v === 'null') { v = self.NULLABLE.indexOf(f) >= 0 ? null : ''; }
+        if (f === 'entry_date') v = Store._normalizeDate(v);
+        obj[f] = v;
+      });
+      return obj;
+    });
+  },
+
+  async write(sheet, records) {
+    var sid = await this.ensure();
+    var schema = this.SCHEMA[sheet];
+    var jf = this.JSON_FIELDS[sheet] || [];
+    var rows = [schema];
+    records.forEach(function(rec) {
+      rows.push(schema.map(function(f) {
+        var v = rec[f];
+        if (v === undefined || v === null) return '';
+        if (jf.indexOf(f) >= 0) return JSON.stringify(v);
+        return String(v);
+      }));
+    });
+    await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + sheet + ':clear',
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    var range = sheet + '!A1:' + this._col(schema.length) + rows.length;
+    var r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
+      { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ values: rows }) });
+    if (!r.ok) throw new Error('Write failed: ' + r.status);
   }
 };
 
@@ -523,7 +784,8 @@ function syncLabel(key, vars){
   const L = {
     synced: { en: '[ Synced ]', zh: '[ 已同步 ]' },
     syncing: { en: '[ Syncing: {n} pending ]', zh: '[ 同步中：{n} 待傳 ]' },
-    offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' }
+    offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' },
+    local: { en: '[ Local only ]', zh: '[ 僅本機 ]' }
   };
   let s = (L[key] && (L[key][currentLang] || L[key].en)) || key;
   if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
@@ -534,7 +796,12 @@ function updateSyncUI(){
   const el = $('#syncIndicator');
   if(!el) return;
   const n = Store.countDirty();
-  if(n === 0){
+  const isGoogle = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const hasBackend = isGoogle || Store.endpoint;
+  if(!hasBackend){
+    el.textContent = syncLabel('local');
+    el.style.color = 'var(--mid)';
+  } else if(n === 0){
     el.textContent = syncLabel('synced');
     el.style.color = 'var(--mid)';
   } else if(!navigator.onLine){
@@ -543,6 +810,28 @@ function updateSyncUI(){
   } else {
     el.textContent = syncLabel('syncing', { n });
     el.style.color = 'var(--pos)';
+  }
+}
+
+function updateAuthUI(){
+  var isSignedIn = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  var brandBtn = $('#brandBtn');
+  var sep = $('#authSep');
+  var signInBtn = $('#googleSignIn');
+  var userArea = $('#googleUser');
+  if(isSignedIn){
+    if(brandBtn) brandBtn.style.display = 'none';
+    if(sep) sep.style.display = 'none';
+    if(signInBtn) signInBtn.style.display = 'none';
+    if(userArea){
+      userArea.style.display = '';
+      $('#googleEmail').textContent = GoogleAuth.userEmail || '...';
+    }
+  } else {
+    if(brandBtn) brandBtn.style.display = '';
+    if(sep) sep.style.display = '';
+    if(signInBtn) signInBtn.style.display = '';
+    if(userArea) userArea.style.display = 'none';
   }
 }
 
@@ -610,6 +899,10 @@ const I18N = {
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
+  auth_endpoint:{en:'Endpoint URL',zh:'端點 URL'},
+  auth_or:{en:'or',zh:'或'},
+  auth_signin:{en:'Sign in with Google',zh:'使用 Google 登入'},
+  auth_signout:{en:'Sign out',zh:'登出'},
   sleep_head:{en:'Sleep',zh:'睡眠'}, sleep_hint:{en:'previous night — all optional',zh:'前一夜 — 皆為選填'},
   sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep Onset (rough)',zh:'入睡時間（概估）'},
   sleep_wakes:{en:'Wake Count',zh:'醒來次數'}, sleep_wake_time:{en:'Wake Time',zh:'早晨醒來'},
@@ -1383,19 +1676,38 @@ $('#brandBtn').addEventListener('click', ()=>{
   Store.syncQueue();
 });
 
+$('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
+$('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
+
 window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud(); Store.syncQueue(); });
 window.addEventListener('offline', updateSyncUI);
 
+let _gisAttempts = 0;
+function _waitForGIS(){
+  if(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2){
+    GoogleAuth.init();
+    updateAuthUI();
+    if(localStorage.getItem('monitor_auth_mode') === 'google'){
+      GoogleAuth.trySilentSignIn();
+    }
+  } else if(++_gisAttempts < 25){
+    setTimeout(_waitForGIS, 200);
+  }
+}
+
 (async function appInit(){
-  await Store.hydrateFromCloud();
   rebuildAssessItems();
   loadDaily(todayISO());
   loadAssess(todayISO());
   loadMeds(todayISO());
   refreshDueBanner();
+  renderI18n();
+
+  await Store.hydrateFromCloud();
   updateSyncUI();
   Store.syncQueue();
-  renderI18n();
+
+  _waitForGIS();
 })();
 </script>
 </body>
