@@ -61,7 +61,7 @@ main { padding-top: 22px; }
 
 label.fld { display: block; margin-bottom: 13px; }
 label.fld > .lab { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; letter-spacing: 0.02em; }
-input[type=text], input[type=number], input[type=time], input[type=date], textarea, select {
+input[type=text], input[type=number], input[type=time], input[type=date], input[type=datetime-local], textarea, select {
   width: 100%; background: var(--field); border: 1px solid var(--line); padding: 8px 9px;
   font-family: var(--mono); font-size: 14px; color: var(--ink); border-radius: 0;
 }
@@ -159,6 +159,21 @@ input[type=range].valence::-moz-range-thumb {
 
 .footnote { font-size: 11px; color: var(--mid); line-height: 1.6; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); }
 .footnote code { background: var(--panel); padding: 1px 4px; border: 1px solid var(--line); }
+
+/* Toggle yes/no buttons (Task C) */
+.toggle-yn { display: flex; gap: 0; border: 1px solid var(--line-strong); }
+.tyn {
+  flex: 1; background: var(--field); border: none; border-right: 1px solid var(--line-strong);
+  padding: 9px 6px; font-family: var(--mono); font-size: 12px; cursor: pointer;
+  text-align: center; transition: background 0.1s; letter-spacing: 0.02em;
+}
+.tyn:last-child { border-right: none; }
+.tyn:hover { background: #ece9e1; }
+.tyn.on { background: var(--ink); color: var(--bg); font-weight: 700; }
+
+/* Sleep section (Task A) */
+.zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
+.zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -214,7 +229,42 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="block">
-    <div class="block-title"><span data-i18n="bio_fact">Biological fact</span> <span class="hint" data-i18n="bio_hint">ate / slept / pain / etc.</span></div>
+    <div class="block-title"><span data-i18n="sleep_head">Sleep</span> <span class="hint" data-i18n="sleep_hint">previous night — all optional</span></div>
+    <div class="row">
+      <label class="fld">
+        <span class="lab" data-i18n="sleep_bedtime">Bedtime</span>
+        <input type="time" id="d_sleep_bedtime">
+      </label>
+      <label class="fld">
+        <span class="lab" data-i18n="sleep_onset">Sleep Onset (rough)</span>
+        <input type="time" id="d_sleep_onset">
+      </label>
+    </div>
+    <div class="row">
+      <label class="fld">
+        <span class="lab" data-i18n="sleep_wakes">Wake Count</span>
+        <input type="number" id="d_sleep_wakes" min="0" max="20" step="1">
+      </label>
+      <label class="fld">
+        <span class="lab" data-i18n="sleep_wake_time">Wake Time</span>
+        <input type="time" id="d_sleep_wake">
+      </label>
+    </div>
+    <label class="fld">
+      <span class="lab" data-i18n="sleep_quality_label">Sleep Quality (optional)</span>
+      <select id="d_sleep_quality">
+        <option value="">—</option>
+        <option value="poor" data-i18n-opt="sq_poor">Poor</option>
+        <option value="fair" data-i18n-opt="sq_fair">Fair</option>
+        <option value="ok" data-i18n-opt="sq_ok">OK</option>
+        <option value="good" data-i18n-opt="sq_good">Good</option>
+      </select>
+    </label>
+    <div class="zolon-auto" id="d_sleep_zolon"></div>
+  </div>
+
+  <div class="block">
+    <div class="block-title"><span data-i18n="bio_fact">Biological Facts</span> <span class="hint" data-i18n="bio_hint">ate / slept / pain / etc.</span></div>
     <textarea id="d_bio" data-i18n-placeholder="bio_placeholder" placeholder="one concrete bodily fact, if any"></textarea>
   </div>
 
@@ -322,7 +372,7 @@ const Store = {
   _key: 'monitor_v1',
   get endpoint() { return localStorage.getItem('monitor_endpoint'); },
 
-  // --- CORE LOCAL READ/WRITE (RESTORED) ---
+  // --- CORE LOCAL READ/WRITE ---
   _all() {
     try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
     catch(e){ return {daily:[],assess:[],meds:[]}; }
@@ -336,7 +386,6 @@ const Store = {
   everything(){ return this._all(); },
   exportClean(){
     const d = this._all();
-    // remove _dirty flags for export
     ['daily','assess','meds'].forEach(c => d[c].forEach(r => delete r._dirty));
     return d;
   },
@@ -353,16 +402,16 @@ const Store = {
     return n;
   },
 
-  // --- NEW SYNC LOGIC ---
+  // --- SYNC LOGIC ---
   put(coll, record) {
     const d = this._all();
-    record._dirty = true; // Mark for sync
+    record._dirty = true;
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
     this._commit(d);
 
     if (typeof updateSyncUI === 'function') updateSyncUI();
-    this.syncQueue(); // Non-blocking trigger
+    this.syncQueue();
   },
 
   async syncQueue() {
@@ -413,16 +462,12 @@ const Store = {
   },
 
   // Convert a cloud-returned entry_date back to a plain local YYYY-MM-DD.
-  // The Sheet coerces "2026-05-23" into a date and returns it as a UTC
-  // timestamp ("2026-05-22T16:00:00.000Z"). Interpreting that timestamp in
-  // the browser's LOCAL timezone (Taipei = UTC+8) recovers the intended day.
-  // A value already in YYYY-MM-DD form is passed through untouched.
   _normalizeDate(val) {
     if (val === null || val === undefined || val === '') return val;
     const s = String(val);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;          // already a plain date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     const d = new Date(s);
-    if (isNaN(d.getTime())) return s;                      // unparseable → leave as-is
+    if (isNaN(d.getTime())) return s;
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -439,13 +484,11 @@ const Store = {
       const data = JSON.parse(textResult);
       if (data.daily === undefined && data.assess === undefined && data.meds === undefined) return;
 
-      // Fields stored as JSON strings in the Sheet that must be parsed back to objects/arrays.
       const JSON_FIELDS = {
         daily: ['body_sensations'],
         assess: ['phq9_items', 'gad7_items'],
         meds: ['entries']
       };
-      // reparse JSON-string fields AND normalize entry_date for one collection's rows.
       const clean = (coll, rows) => (rows || []).map(r => {
         (JSON_FIELDS[coll] || []).forEach(f => {
           if (typeof r[f] === 'string') {
@@ -462,24 +505,19 @@ const Store = {
         meds: clean('meds', data.meds)
       };
 
-      // --- MERGE, don't replace -------------------------------------------
-      // Start from the cloud copy, then overlay any LOCAL record still marked
-      // _dirty (i.e. not yet synced). This guarantees an entry created offline
-      // on one device is never erased by a hydrate that ran before it synced.
+      // MERGE: cloud as base, unsynced local wins
       const local = this._all();
       const merged = {};
       ['daily', 'assess', 'meds'].forEach(coll => {
         const bySub = {};
         (cloud[coll] || []).forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
         (local[coll] || []).forEach(r => {
-          if (r && r._dirty && r.submission_id) bySub[r.submission_id] = r;  // unsynced local wins
+          if (r && r._dirty && r.submission_id) bySub[r.submission_id] = r;
         });
-        // deterministic order so the change-comparison below doesn't fire on reordering alone
         merged[coll] = Object.values(bySub).sort((a, b) =>
           String(a.submission_id).localeCompare(String(b.submission_id)));
       });
 
-      // Only commit + reload if the merge actually changes local state.
       const before = JSON.stringify(this._all());
       const after = JSON.stringify(merged);
       if (before !== after) {
@@ -556,6 +594,7 @@ const I18N = {
   field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
   field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
   field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
+  field_taken_at:{en:'Taken at',zh:'服用時間'},
   effect_ph:{en:'e.g. palpitations / none',zh:'例：心悸 / 無'}, amount_ph:{en:'e.g. a few puffs',zh:'例：幾口'},
   yes:{en:'Yes',zh:'是'}, no:{en:'No',zh:'否'},
   med_wellbutrin:{en:'Wellbutrin XL 300mg',zh:'Wellbutrin XL 300mg'}, med_zolon:{en:'Zolon 7.5mg (zopiclone)',zh:'Zolon 7.5mg (zopiclone)'},
@@ -566,20 +605,31 @@ const I18N = {
   toast_daily_saved:{en:'Daily entry saved',zh:'每日紀錄已儲存'}, toast_daily_updated:{en:'Daily entry updated',zh:'每日紀錄已更新'},
   toast_assess_saved:{en:'Assessment saved',zh:'評估已儲存'}, toast_assess_updated:{en:'Assessment updated',zh:'評估已更新'},
   toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
+  toast_invalid_dose:{en:'Invalid dose (0–10 tablets)',zh:'無效劑量（0–10 錠）'},
   daily_sub_onfile:{en:'entry on file for {date} — save will update',zh:'{date} 已有紀錄 — 儲存將更新'},
   assess_sub_onfile:{en:'assessment on file for {date} — save will update',zh:'{date} 已有評估 — 儲存將更新'},
   meds_sub_onfile:{en:'{n} intake(s) on file for {date}',zh:'{date} 已有 {n} 筆服用紀錄'},
   log_mood:{en:'mood',zh:'情緒'}, log_body:{en:'body',zh:'身體'}, log_bio:{en:'bio fact',zh:'生理'}, log_note:{en:'note',zh:'備註'},
+  log_sleep:{en:'sleep',zh:'睡眠'},
   log_difficulty:{en:'difficulty',zh:'困難度'}, log_meds:{en:'meds',zh:'用藥'}, log_incomplete:{en:'incomplete',zh:'未完成'},
   log_backfilled:{en:'backfilled',zh:'補登'}, log_valence:{en:'valence',zh:'效價'},
   log_med_entries:{en:'med entries',zh:'用藥筆數'}, log_edit_daily:{en:'edit daily',zh:'編輯每日'}, log_edit_assess:{en:'edit assessment',zh:'編輯評估'},
   log_edit_meds:{en:'edit meds',zh:'編輯用藥'}, log_empty:{en:'No entries yet.',zh:'尚無紀錄。'},
   due_none:{en:'No assessment on record yet — the first one establishes your baseline.',zh:'尚無評估紀錄 — 第一次將建立基準。'},
-  due_reached:{en:'Due — last assessment {days} days ago ({date}). Biweekly target reached.',zh:'到期 — 上次評估 {days} 天前（{date}）。已達雙週目標。'},
+  due_reached:{en:'Due — last completed {date}. Biweekly target reached.',zh:'到期 — 上次完成 {date}。已達雙週目標。'},
   due_countdown:{en:'Last assessment {days} day(s) ago ({date}). Next due in {left} day(s).',zh:'上次評估 {days} 天前（{date}）。{left} 天後到期。'},
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
+  // Sleep section (Task A)
+  sleep_head:{en:'Sleep',zh:'睡眠'}, sleep_hint:{en:'previous night — all optional',zh:'前一夜 — 皆為選填'},
+  sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep onset (rough)',zh:'入睡時間（概估）'},
+  sleep_wakes:{en:'Wake count',zh:'醒來次數'}, sleep_wake_time:{en:'Morning wake',zh:'早晨醒來'},
+  sleep_quality_label:{en:'Quality (optional)',zh:'品質（選填）'},
+  sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'OK',zh:'可以'}, sq_good:{en:'Good',zh:'好'},
+  sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
+  sleep_zolon_none:{en:'none logged',zh:'無紀錄'},
+  // Body sensations
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
   'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
@@ -630,7 +680,7 @@ const GAD7_ITEMS_ZH = [
   "無法停止或者控制憂慮",
   "過分憂慮不同的事情",
   "難以放鬆",
-  "心緒不寧以至坐立不安",
+  "「心緒不寧以至坐立不安",
   "容易心煩或易怒",
   "感到害怕,就想要發生可怕的事情"
 ];
@@ -641,7 +691,7 @@ const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach
 
 const MED_TEMPLATES = [
   { id:'wellbutrin', name:'Wellbutrin XL 300mg', pattern:'daily', fields:['time','withFood'], multi:false },
-  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','time'], multi:false, mgPerTab:7.5 },
+  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','taken_at'], multi:false, mgPerTab:7.5 },
   { id:'ritalin',    name:'Ritalin 10mg', pattern:'prn-frequent', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
   { id:'recreational', name:'Recreational / other', pattern:'rare', fields:['substance','time','amount','notes'], multi:true,
     options:['THC (vape)','THC (flower)','THC (edible)','Alcohol','MDMA / ecstasy','Ketamine','Other'] }
@@ -671,9 +721,55 @@ function todayISO(){
   return `${y}-${m}-${day}`;
 }
 function nowStamp(){ return new Date().toISOString(); }
+function nowLocalDatetime(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// Toggle helper for yes/no buttons (Task C)
+function setToggle(inputId, val, btn){
+  document.getElementById(inputId).value = val;
+  btn.parentElement.querySelectorAll('.tyn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+// Zolon auto-pull for sleep section (Task A)
+function getZolonForNight(dailyDate){
+  if(!dailyDate) return null;
+  // For daily date D, "previous night" Zolon is in meds record for D-1
+  // (4am cutoff assigns late-night intakes to the prior day)
+  const d = new Date(dailyDate + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  const prevDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const rec = Store.getByDate('meds', prevDate);
+  if(!rec || !rec.entries) return null;
+  const zolonEntries = rec.entries.filter(e => e.medication === 'zolon');
+  if(!zolonEntries.length) return null;
+  return zolonEntries;
+}
+
+function updateZolonDisplay(){
+  const host = $('#d_sleep_zolon');
+  if(!host) return;
+  const date = $('#d_date').value;
+  const entries = getZolonForNight(date);
+  if(!entries){
+    host.innerHTML = `<span>${t('sleep_zolon_label')}</span> ${t('sleep_zolon_none')}`;
+    return;
+  }
+  const parts = entries.map(e => {
+    let s = '';
+    if(e.tablets) s += `${e.tablets}tab`;
+    if(e.mg) s += ` (${e.mg}mg)`;
+    if(e.taken_at) s += ` @ ${e.taken_at.replace('T',' ')}`;
+    else if(e.time) s += ` @ ${e.time}`;
+    return s.trim();
+  });
+  host.innerHTML = `<span>${t('sleep_zolon_label')}</span> <span class="zolon-val">${esc(parts.join('; '))}</span>`;
+}
 
 function renderI18n(){
   $$('[data-i18n]').forEach(el=>{
@@ -695,6 +791,7 @@ function renderI18n(){
   updateMedsSub();
   refreshDueBanner();
   renderMedLedger();
+  updateZolonDisplay();
   if($('#seg-log').classList.contains('active')) renderLog();
 }
 
@@ -754,6 +851,12 @@ function collectDaily(){
     body_sensations: body,
     body_tension_where: body.includes('Tension') ? $('#d_body_tension').value.trim() : '',
     body_other: body.includes('Other') ? $('#d_body_other').value.trim() : '',
+    // Sleep fields (Task A)
+    sleep_bedtime: $('#d_sleep_bedtime').value || '',
+    sleep_onset: $('#d_sleep_onset').value || '',
+    sleep_wakes: $('#d_sleep_wakes').value !== '' ? +$('#d_sleep_wakes').value : null,
+    sleep_wake_time: $('#d_sleep_wake').value || '',
+    sleep_quality: $('#d_sleep_quality').value || '',
     biological_fact: $('#d_bio').value.trim(),
     note: $('#d_note').value.trim()
   };
@@ -768,6 +871,10 @@ function clearDailyForm(){
   $$('#d_body .chip.on').forEach(c=>c.classList.remove('on'));
   $('#d_body_other').classList.remove('show'); $('#d_body_tension').classList.remove('show');
   $('#d_body_other').value=''; $('#d_body_tension').value='';
+  // Clear sleep fields
+  $('#d_sleep_bedtime').value=''; $('#d_sleep_onset').value='';
+  $('#d_sleep_wakes').value=''; $('#d_sleep_wake').value='';
+  $('#d_sleep_quality').value='';
   $('#d_bio').value=''; $('#d_note').value='';
 }
 function loadDaily(date){
@@ -788,10 +895,17 @@ function loadDaily(date){
     });
     $('#d_body_tension').value = rec.body_tension_where || '';
     $('#d_body_other').value = rec.body_other || '';
+    // Load sleep fields
+    if(rec.sleep_bedtime) $('#d_sleep_bedtime').value = rec.sleep_bedtime;
+    if(rec.sleep_onset) $('#d_sleep_onset').value = rec.sleep_onset;
+    if(rec.sleep_wakes !== null && rec.sleep_wakes !== undefined) $('#d_sleep_wakes').value = rec.sleep_wakes;
+    if(rec.sleep_wake_time) $('#d_sleep_wake').value = rec.sleep_wake_time;
+    if(rec.sleep_quality) $('#d_sleep_quality').value = rec.sleep_quality;
     $('#d_bio').value = rec.biological_fact || '';
     $('#d_note').value = rec.note || '';
   }
   updateDailySub();
+  updateZolonDisplay();
 }
 function saveDaily(){
   if(!$('#d_date').value){ toast(t('toast_set_entry_date')); return; }
@@ -804,7 +918,7 @@ function saveDaily(){
     updateDailySub();
   });
 }
-function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); }
+function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); updateZolonDisplay(); }
 $('#d_date').addEventListener('change', ()=>loadDaily($('#d_date').value));
 
 function getAssessItemText(itemsEn, itemsZh, i){
@@ -945,7 +1059,7 @@ function refreshDueBanner(){
   const days = Math.floor((new Date(todayISO()) - new Date(last)) / 86400000);
   if(days>=14){
     banner.className='due-banner';
-    banner.textContent=t('due_reached',{days,date:fmtDate(last)});
+    banner.textContent=t('due_reached',{date:fmtDate(last)});
   } else {
     banner.className='due-banner notdue';
     banner.textContent=t('due_countdown',{days,date:fmtDate(last),left:14-days});
@@ -957,8 +1071,9 @@ function fieldHTML(med, f, ridx){
   const tabLabel = med.mgPerTab && f==='tablets' ? ` (${med.mgPerTab}mg)` : '';
   switch(f){
     case 'time': return `<label class="fld"><span class="lab">${t('field_time')}</span><input type="time" id="${id}"></label>`;
-    case 'tablets': return `<label class="fld"><span class="lab">${t('field_tablets')}${tabLabel}</span><input type="number" step="0.5" min="0" id="${id}"></label>`;
-    case 'withFood': return `<label class="fld"><span class="lab">${t('field_with_food')}</span><select id="${id}"><option value="">—</option><option value="Yes">${t('yes')}</option><option value="No">${t('no')}</option></select></label>`;
+    case 'taken_at': return `<label class="fld"><span class="lab">${t('field_taken_at')}</span><input type="datetime-local" id="${id}" value="${nowLocalDatetime()}"></label>`;
+    case 'tablets': return `<label class="fld"><span class="lab">${t('field_tablets')}${tabLabel}</span><input type="number" step="0.5" min="0" max="10" id="${id}"></label>`;
+    case 'withFood': return `<label class="fld"><span class="lab">${t('field_with_food')}</span><input type="hidden" id="${id}" value=""><div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('${id}','Yes',this)">${t('yes')}</button><button type="button" class="tyn" onclick="setToggle('${id}','No',this)">${t('no')}</button></div></label>`;
     case 'effect': return `<label class="fld"><span class="lab">${t('field_effect')}</span><input type="text" id="${id}" placeholder="${esc(t('effect_ph'))}"></label>`;
     case 'substance': return `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${(med.options||[]).map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`;
     case 'amount': return `<label class="fld"><span class="lab">${t('field_amount')}</span><input type="text" id="${id}" placeholder="${esc(t('amount_ph'))}"></label>`;
@@ -993,6 +1108,8 @@ function clearMedQuickFields(){
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
     if(el) el.value = '';
   });
+  // Clear toggle button visual states
+  $$('#med_quick_fields .tyn.on').forEach(b => b.classList.remove('on'));
 }
 
 function collectQuickMedEntry(){
@@ -1034,6 +1151,11 @@ function logIntake(){
   if(!date){ toast(t('toast_set_log_date')); return; }
   const entry = collectQuickMedEntry();
   if(!entry){ toast(t('toast_fill_field')); return; }
+  // Dose validation (Task D)
+  if(entry.tablets !== undefined){
+    const tabs = +entry.tablets;
+    if(isNaN(tabs) || tabs < 0 || tabs > 10){ toast(t('toast_invalid_dose')); return; }
+  }
   guardSubmitBtn($('#btn_log_intake'), ()=>{
     const rec = getMedsRecord(date, true);
     const existing = Store.getByDate('meds', date);
@@ -1060,7 +1182,8 @@ function removeMedEntry(idx){
 function medLineDisplay(m){
   const parts = [t('med_'+m.medication) || m.med_name];
   if(m.substance) parts.push(t(m.substance) || m.substance);
-  if(m.time) parts.push(m.time);
+  if(m.taken_at) parts.push(m.taken_at.replace('T',' '));
+  else if(m.time) parts.push(m.time);
   if(m.tablets) parts.push(`${m.tablets}tab${m.mg ? ` (${m.mg}mg)` : ''}`);
   if(m.amount) parts.push(m.amount);
   if(m.withFood) parts.push(`${t('food_label')}:${m.withFood === 'Yes' ? t('yes') : m.withFood === 'No' ? t('no') : m.withFood}`);
@@ -1143,6 +1266,16 @@ function renderLog(){
           + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
           + (d.body_other ? ` · ${esc(d.body_other)}` : '');
         body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
+      }
+      // Sleep in log (Task A)
+      if(d.sleep_bedtime || d.sleep_wake_time){
+        let sleepTxt = '';
+        if(d.sleep_bedtime) sleepTxt += `bed ${esc(d.sleep_bedtime)}`;
+        if(d.sleep_onset) sleepTxt += ` → onset ~${esc(d.sleep_onset)}`;
+        if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
+        if(d.sleep_wake_time) sleepTxt += ` · up ${esc(d.sleep_wake_time)}`;
+        if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
+        body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
       }
       if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
       if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
