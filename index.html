@@ -182,6 +182,14 @@ input[type=range].valence::-moz-range-thumb {
 .btn-persist:hover { border-color: var(--ink); color: var(--ink); }
 .btn-signin { background: var(--field); border: 1px solid var(--line-strong); padding: 4px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; letter-spacing: 0.03em; }
 .btn-signin:hover { background: var(--ink); color: var(--bg); }
+.tpl-item { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.tpl-item:last-child { border-bottom: none; }
+.tpl-item .tpl-name { font-weight: 600; }
+.tpl-item .tpl-fields { color: var(--mid); font-size: 10px; margin-left: 8px; }
+.tpl-item .btn-rm-tpl { background: none; border: none; font-family: var(--mono); font-size: 14px; color: var(--mid); cursor: pointer; padding: 0 4px; }
+.tpl-item .btn-rm-tpl:hover { color: var(--neg); }
+.btn-reset-tpl { background: none; border: none; font-family: var(--mono); font-size: 10px; color: var(--mid); text-decoration: underline; cursor: pointer; padding: 0; margin-top: 10px; display: block; }
+.btn-reset-tpl:hover { color: var(--ink); }
 </style>
 <script src="https://accounts.google.com/gsi/client" async></script>
 </head>
@@ -362,6 +370,29 @@ input[type=range].valence::-moz-range-thumb {
     <div id="med_quick_fields"></div>
     <div class="actions" style="margin-top:10px;">
       <button type="button" id="btn_log_intake" class="btn-primary" onclick="logIntake()" data-i18n="log_intake">Log intake</button>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="block-title">
+      <span data-i18n="manage_templates">Manage templates</span>
+      <button type="button" class="btn-ghost" id="btn_toggle_tpl_editor" style="padding:3px 10px;font-size:10px;letter-spacing:0.06em;" data-i18n="tpl_toggle">edit</button>
+    </div>
+    <div id="tpl_editor" style="display:none;">
+      <div id="tpl_list"></div>
+      <div class="tpl-add" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
+        <label class="fld"><span class="lab" data-i18n="tpl_name">Drug name</span><input type="text" id="tpl_new_name" placeholder="e.g. Lexapro 10mg"></label>
+        <div class="lab" style="margin-bottom:6px;" data-i18n="tpl_fields">Fields to track</div>
+        <div class="chips" id="tpl_field_chips"></div>
+        <div class="row" style="margin-top:10px;">
+          <label class="fld"><span class="lab" data-i18n="tpl_mg">mg per tablet (optional)</span><input type="number" id="tpl_new_mg" step="any" min="0" style="max-width:120px;"></label>
+          <label class="fld"><span class="lab" data-i18n="tpl_multi">Multiple per day?</span>
+            <div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('tpl_new_multi','true',this)" data-i18n="yes">Yes</button><button type="button" class="tyn" onclick="setToggle('tpl_new_multi','false',this)" data-i18n="no">No</button></div>
+            <input type="hidden" id="tpl_new_multi" value="false">
+          </label>
+        </div>
+        <button type="button" class="btn-primary" style="margin-top:8px;" onclick="addCustomTemplate()" data-i18n="tpl_add">Add template</button>
+      </div>
     </div>
   </div>
 
@@ -1201,12 +1232,18 @@ const I18N = {
   meds_head:{en:'Medication',zh:'用藥'}, meds_sub:{en:'stream ledger · log each intake',zh:'流水帳 · 逐筆記錄'},
   log_date:{en:'Log date',zh:'紀錄日期'}, quick_entry:{en:'Quick entry',zh:'快速輸入'}, medication:{en:'Medication',zh:'藥物'},
   log_intake:{en:'Log intake',zh:'記錄服用'}, todays_ledger:{en:"Today's ledger",zh:'今日流水'},
+  manage_templates:{en:'Manage templates',zh:'管理模板'}, tpl_toggle:{en:'edit',zh:'編輯'}, tpl_hide:{en:'hide',zh:'隱藏'},
+  tpl_name:{en:'Drug name',zh:'藥物名稱'}, tpl_fields:{en:'Fields to track',zh:'追蹤欄位'},
+  tpl_mg:{en:'mg per tablet (optional)',zh:'每錠毫克（選填）'}, tpl_multi:{en:'Multiple per day?',zh:'每日可多次？'},
+  tpl_add:{en:'Add template',zh:'新增模板'}, tpl_reset:{en:'Reset to defaults',zh:'恢復預設'},
+  tpl_added:{en:'Template added',zh:'已新增模板'}, tpl_reset_done:{en:'Templates reset to defaults',zh:'模板已恢復預設'},
+  tpl_name_required:{en:'Enter a drug name',zh:'請輸入藥物名稱'}, tpl_fields_required:{en:'Select at least one field',zh:'請至少選擇一個欄位'},
   log_head:{en:'Log',zh:'紀錄'}, log_sub:{en:'recent entries · newest first',zh:'近期紀錄 · 新到舊'},
   export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'}, import_json:{en:'Import JSON',zh:'匯入 JSON'},
   toast_import_done:{en:'{n} record(s) imported',zh:'已匯入 {n} 筆紀錄'}, toast_import_skipped:{en:'{n} skipped',zh:'{n} 筆略過'},
   toast_import_invalid:{en:'Invalid file — expected JSON export',zh:'無效檔案 — 需為 JSON 匯出格式'},
   toast_import_version:{en:'Export version too new — update the app first',zh:'匯出版本過新 — 請先更新應用'},
-  field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
+  field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_withFood:{en:'With food',zh:'與食物同服'},
   field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
   field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
   field_taken_at:{en:'Taken at',zh:'服用時間'},
@@ -1313,13 +1350,24 @@ const OPTS_ZH = ["完全沒有", "幾天", "一半以上的天數", "幾乎每�
 
 const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach discomfort','Shallow breathing','Restlessness','Numbness','Neutral','Other'];
 
-const MED_TEMPLATES = [
-  { id:'wellbutrin', name:'Wellbutrin XL 300mg', pattern:'daily', fields:['time','withFood'], multi:false },
-  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','taken_at'], multi:false, mgPerTab:7.5 },
-  { id:'ritalin',    name:'Ritalin 10mg', pattern:'prn-frequent', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
-  { id:'recreational', name:'Recreational / other', pattern:'rare', fields:['substance','time','amount','notes'], multi:true,
+const _DEFAULT_MED_TEMPLATES = [
+  { id:'wellbutrin', name:'Wellbutrin XL 300mg', fields:['time','withFood'], multi:false },
+  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', fields:['tablets','taken_at'], multi:false, mgPerTab:7.5 },
+  { id:'ritalin',    name:'Ritalin 10mg', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
+  { id:'recreational', name:'Recreational / other', fields:['substance','time','amount','notes'], multi:true,
     options:['THC (vape)','THC (flower)','THC (edible)','Alcohol','MDMA / ecstasy','Ketamine','Other'] }
 ];
+const _MED_TPL_KEY = 'monitor_med_templates';
+const _ALL_MED_FIELDS = ['time','taken_at','tablets','withFood','effect','substance','amount','notes'];
+
+function getMedTemplates(){
+  try {
+    const raw = localStorage.getItem(_MED_TPL_KEY);
+    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr; }
+  } catch(e){}
+  return _DEFAULT_MED_TEMPLATES;
+}
+function saveMedTemplates(arr){ localStorage.setItem(_MED_TPL_KEY, JSON.stringify(arr)); }
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -1483,6 +1531,7 @@ function renderI18n(){
   updateMedsSub();
   refreshDueBanner();
   renderMedLedger();
+  if($('#tpl_editor').style.display !== 'none') renderTplEditor();
   updateZolonDisplay();
   if($('#seg-log').classList.contains('active')) renderLog();
 }
@@ -1762,9 +1811,11 @@ function fieldHTML(med, f, ridx){
     case 'time': return `<label class="fld"><span class="lab">${t('field_time')}</span><input type="time" id="${id}"></label>`;
     case 'taken_at': return `<label class="fld"><span class="lab">${t('field_taken_at')}</span><input type="datetime-local" id="${id}" value="${nowLocalDatetime()}"></label>`;
     case 'tablets': return `<label class="fld"><span class="lab">${t('field_tablets')}${tabLabel}</span><input type="number" step="0.5" min="0" max="10" id="${id}"></label>`;
-    case 'withFood': return `<label class="fld"><span class="lab">${t('field_with_food')}</span><input type="hidden" id="${id}" value=""><div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('${id}','Yes',this)">${t('yes')}</button><button type="button" class="tyn" onclick="setToggle('${id}','No',this)">${t('no')}</button></div></label>`;
+    case 'withFood': return `<label class="fld"><span class="lab">${t('field_withFood')}</span><input type="hidden" id="${id}" value=""><div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('${id}','Yes',this)">${t('yes')}</button><button type="button" class="tyn" onclick="setToggle('${id}','No',this)">${t('no')}</button></div></label>`;
     case 'effect': return `<label class="fld"><span class="lab">${t('field_effect')}</span><input type="text" id="${id}" placeholder="${esc(t('effect_ph'))}"></label>`;
-    case 'substance': return `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${(med.options||[]).map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`;
+    case 'substance': return (med.options && med.options.length)
+      ? `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${med.options.map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`
+      : `<label class="fld"><span class="lab">${t('field_substance')}</span><input type="text" id="${id}"></label>`;
     case 'amount': return `<label class="fld"><span class="lab">${t('field_amount')}</span><input type="text" id="${id}" placeholder="${esc(t('amount_ph'))}"></label>`;
     case 'notes': return `<label class="fld"><span class="lab">${t('field_notes')}</span><input type="text" id="${id}"></label>`;
     default: return '';
@@ -1774,10 +1825,11 @@ function fieldHTML(med, f, ridx){
 function initMedSelector(){
   const sel = $('#med_selector');
   const cur = sel.value;
-  sel.innerHTML = `<option value="">—</option>` + MED_TEMPLATES.map(m=>
-    `<option value="${m.id}">${esc(t('med_'+m.id))}</option>`
+  const tpls = getMedTemplates();
+  sel.innerHTML = `<option value="">—</option>` + tpls.map(m=>
+    `<option value="${m.id}">${esc(t('med_'+m.id) === 'med_'+m.id ? m.name : t('med_'+m.id))}</option>`
   ).join('');
-  if(cur && MED_TEMPLATES.some(m=>m.id===cur)) sel.value = cur;
+  if(cur && tpls.some(m=>m.id===cur)) sel.value = cur;
 }
 
 function renderMedQuickFields(){
@@ -1785,14 +1837,16 @@ function renderMedQuickFields(){
   const host = $('#med_quick_fields');
   host.innerHTML = '';
   if(!medId) return;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return;
   host.innerHTML = med.fields.map(f=>fieldHTML(med, f, 'quick')).join('');
 }
 
 function clearMedQuickFields(){
   const medId = $('#med_selector').value;
   if(!medId) return;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return;
   med.fields.forEach(f=>{
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
     if(el) el.value = '';
@@ -1803,7 +1857,8 @@ function clearMedQuickFields(){
 function collectQuickMedEntry(){
   const medId = $('#med_selector').value;
   if(!medId) return null;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return null;
   const obj = { medication: med.id, med_name: med.name, id: Math.random().toString(36).slice(2,8), _ts: Date.now() };
   let hasData = false;
   med.fields.forEach(f=>{
@@ -1869,7 +1924,8 @@ function removeMedEntry(entryId){
 }
 
 function medLineDisplay(m){
-  const parts = [t('med_'+m.medication) || m.med_name];
+  const medKey = 'med_'+m.medication;
+  const parts = [t(medKey) === medKey ? (m.med_name || m.medication) : t(medKey)];
   if(m.substance) parts.push(t(m.substance) || m.substance);
   if(m.taken_at) parts.push(m.taken_at.replace('T',' '));
   else if(m.time) parts.push(m.time);
@@ -1918,6 +1974,78 @@ function loadMeds(date){
 $('#med_selector').addEventListener('change', renderMedQuickFields);
 $('#m_date').addEventListener('change', ()=>loadMeds($('#m_date').value));
 initMedSelector();
+
+// ---- Template editor ----
+$('#btn_toggle_tpl_editor').addEventListener('click', function(){
+  const ed = $('#tpl_editor');
+  const showing = ed.style.display !== 'none';
+  ed.style.display = showing ? 'none' : '';
+  this.textContent = showing ? t('tpl_toggle') : t('tpl_hide');
+  if(!showing) renderTplEditor();
+});
+
+function renderTplEditor(){
+  const tpls = getMedTemplates();
+  const list = $('#tpl_list');
+  list.innerHTML = tpls.map(function(m, i){
+    const name = t('med_'+m.id) === 'med_'+m.id ? esc(m.name) : esc(t('med_'+m.id));
+    const flds = m.fields.map(function(f){ return t('field_'+f) === 'field_'+f ? f : t('field_'+f); }).join(', ');
+    const mgNote = m.mgPerTab ? ' · ' + m.mgPerTab + 'mg/tab' : '';
+    const multiNote = m.multi ? ' · multi' : '';
+    return '<div class="tpl-item"><span><span class="tpl-name">' + name + '</span><span class="tpl-fields">' + esc(flds) + mgNote + multiNote + '</span></span>'
+      + '<button type="button" class="btn-rm-tpl" onclick="removeTemplate(' + i + ')" title="Remove">&times;</button></div>';
+  }).join('');
+  list.innerHTML += '<button type="button" class="btn-reset-tpl" onclick="resetTemplates()" data-i18n="tpl_reset">' + t('tpl_reset') + '</button>';
+  // Render field chips
+  const chips = $('#tpl_field_chips');
+  chips.innerHTML = _ALL_MED_FIELDS.map(function(f){
+    const label = t('field_'+f) === 'field_'+f ? f : t('field_'+f);
+    return '<div class="chip" data-field="' + f + '" onclick="this.classList.toggle(\'on\')">' + esc(label) + '</div>';
+  }).join('');
+}
+
+function addCustomTemplate(){
+  const nameInput = $('#tpl_new_name');
+  const name = nameInput.value.trim();
+  if(!name){ toast(t('tpl_name_required')); return; }
+  const selectedFields = [];
+  $$('#tpl_field_chips .chip.on').forEach(function(c){ selectedFields.push(c.dataset.field); });
+  if(!selectedFields.length){ toast(t('tpl_fields_required')); return; }
+  const id = 'custom_' + Math.random().toString(36).slice(2,8);
+  const mgVal = parseFloat($('#tpl_new_mg').value);
+  const multi = $('#tpl_new_multi').value === 'true';
+  const tpl = { id: id, name: name, fields: selectedFields, multi: multi, custom: true };
+  if(mgVal > 0) tpl.mgPerTab = mgVal;
+  const tpls = getMedTemplates().slice();
+  tpls.push(tpl);
+  saveMedTemplates(tpls);
+  // Clear form
+  nameInput.value = '';
+  $('#tpl_new_mg').value = '';
+  $('#tpl_new_multi').value = 'false';
+  $$('#tpl_field_chips .chip.on').forEach(function(c){ c.classList.remove('on'); });
+  $$('.tpl-add .tyn.on').forEach(function(b){ b.classList.remove('on'); });
+  renderTplEditor();
+  initMedSelector();
+  toast(t('tpl_added'));
+}
+
+function removeTemplate(idx){
+  const tpls = getMedTemplates().slice();
+  if(idx < 0 || idx >= tpls.length) return;
+  tpls.splice(idx, 1);
+  if(tpls.length) saveMedTemplates(tpls);
+  else localStorage.removeItem(_MED_TPL_KEY);
+  renderTplEditor();
+  initMedSelector();
+}
+
+function resetTemplates(){
+  localStorage.removeItem(_MED_TPL_KEY);
+  renderTplEditor();
+  initMedSelector();
+  toast(t('tpl_reset_done'));
+}
 
 function medLineHTML(m){ return medLineDisplay(m); }
 
