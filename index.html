@@ -404,6 +404,7 @@ const Store = {
   exportClean(){
     const d = this._all();
     ['daily','assess','meds'].forEach(c => d[c].forEach(r => delete r._dirty));
+    d.version = 1;
     return d;
   },
   deleteBySubmission(coll, submission_id){
@@ -549,13 +550,26 @@ const Store = {
     if (!navigator.onLine) { if (typeof updateSyncUI === 'function') updateSyncUI(); return; }
     if (!_claimSyncLock()) return;
     try {
+      await SheetsSync.ensure();
       const d = this._all();
       let updated = false;
       for (const coll of ['daily','assess','meds']) {
         if (!d[coll].some(r => r._dirty)) continue;
         try {
-          const clean = d[coll].map(r => { const c = Object.assign({}, r); delete c._dirty; return c; });
-          await SheetsSync.write(coll, clean);
+          // Read-before-write: merge cloud state with local to prevent cross-device data loss
+          const cloud = await SheetsSync.read(coll);
+          const bySub = {};
+          cloud.forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
+          d[coll].forEach(r => {
+            if (r && r.submission_id) {
+              const c = Object.assign({}, r);
+              delete c._dirty;
+              bySub[c.submission_id] = c;  // local always wins (dirty or not — we have latest local state)
+            }
+          });
+          const merged = Object.values(bySub).sort((a, b) =>
+            String(a.submission_id).localeCompare(String(b.submission_id)));
+          await SheetsSync.write(coll, merged);
           d[coll].forEach(r => { r._dirty = false; });
           updated = true;
           _syncError = false;
@@ -630,6 +644,7 @@ const Store = {
 // ---- Sync state ----
 let _syncError = false;
 let _hydrating = false;
+let _authExpired = false;
 const _TAB_ID = Math.random().toString(36).slice(2);
 const _SYNC_LOCK_KEY = 'monitor_sync_lock';
 const _SYNC_LOCK_TTL = 30000;
@@ -692,6 +707,7 @@ const GoogleAuth = {
       updateAuthUI();
       return;
     }
+    _authExpired = false;
     this._fetchEmail();
     if (this._refreshResolve) {
       this._refreshResolve();
@@ -747,12 +763,17 @@ const GoogleAuth = {
       try { await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this)); }
       catch(e) { if (!this.token) this.token = savedToken; }
     }
+    _authExpired = false;
     opts = opts || {};
     opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + this.token });
     let res = await fetch(url, opts);
     if (res.status === 401) {
       await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this));
-      if (!this.token) throw new Error('Token refresh failed');
+      if (!this.token) {
+        _authExpired = true;
+        if (typeof updateSyncUI === 'function') updateSyncUI();
+        throw new Error('Token refresh failed — sign in again');
+      }
       opts.headers['Authorization'] = 'Bearer ' + this.token;
       res = await fetch(url, opts);
     }
@@ -881,7 +902,8 @@ function syncLabel(key, vars){
     offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' },
     local: { en: '[ Local only ]', zh: '[ 僅本機 ]' },
     error: { en: '[ Sync error ]', zh: '[ 同步錯誤 ]' },
-    hydrating: { en: '[ Loading… ]', zh: '[ 載入中… ]' }
+    hydrating: { en: '[ Loading… ]', zh: '[ 載入中… ]' },
+    reauth: { en: '[ Sign in again ]', zh: '[ 請重新登入 ]' }
   };
   let s = (L[key] && (L[key][currentLang] || L[key].en)) || key;
   if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
@@ -902,6 +924,9 @@ function updateSyncUI(){
   if(!hasBackend){
     el.textContent = syncLabel('local');
     el.style.color = 'var(--mid)';
+  } else if(_authExpired){
+    el.textContent = syncLabel('reauth');
+    el.style.color = 'var(--neg)';
   } else if(_syncError){
     el.textContent = syncLabel('error');
     el.style.color = 'var(--neg)';
@@ -981,7 +1006,9 @@ const I18N = {
   log_intake:{en:'Log intake',zh:'記錄服用'}, todays_ledger:{en:"Today's ledger",zh:'今日流水'},
   log_head:{en:'Log',zh:'紀錄'}, log_sub:{en:'recent entries · newest first',zh:'近期紀錄 · 新到舊'},
   export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'}, import_json:{en:'Import JSON',zh:'匯入 JSON'},
-  toast_import_done:{en:'{n} record(s) imported',zh:'已匯入 {n} 筆紀錄'}, toast_import_invalid:{en:'Invalid file — expected JSON export',zh:'無效檔案 — 需為 JSON 匯出格式'},
+  toast_import_done:{en:'{n} record(s) imported',zh:'已匯入 {n} 筆紀錄'}, toast_import_skipped:{en:'{n} skipped',zh:'{n} 筆略過'},
+  toast_import_invalid:{en:'Invalid file — expected JSON export',zh:'無效檔案 — 需為 JSON 匯出格式'},
+  toast_import_version:{en:'Export version too new — update the app first',zh:'匯出版本過新 — 請先更新應用'},
   field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
   field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
   field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
@@ -1783,6 +1810,24 @@ function exportCSV(){
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
 
+function _validateRecord(coll, r) {
+  if (!r || typeof r !== 'object') return false;
+  if (typeof r.submission_id !== 'string' || !r.submission_id) return false;
+  if (r.entry_date && !/^\d{4}-\d{2}-\d{2}$/.test(Store._normalizeDate(r.entry_date))) return false;
+  if (coll === 'daily') {
+    if (r.valence !== undefined && typeof r.valence !== 'number') return false;
+    if (r.body_sensations !== undefined && !Array.isArray(r.body_sensations)) return false;
+  } else if (coll === 'assess') {
+    if (r.phq9_items !== undefined && !Array.isArray(r.phq9_items)) return false;
+    if (r.gad7_items !== undefined && !Array.isArray(r.gad7_items)) return false;
+    if (r.phq9_total !== undefined && typeof r.phq9_total !== 'number') return false;
+    if (r.gad7_total !== undefined && typeof r.gad7_total !== 'number') return false;
+  } else if (coll === 'meds') {
+    if (r.entries !== undefined && !Array.isArray(r.entries)) return false;
+  }
+  return true;
+}
+
 function importJSON(input){
   const file = input.files && input.files[0];
   if(!file) return;
@@ -1791,17 +1836,20 @@ function importJSON(input){
     try {
       const data = JSON.parse(e.target.result);
       if(!data || typeof data !== 'object'){ toast(t('toast_import_invalid')); return; }
+      // Handle versioned and unversioned exports
+      const version = data.version || 0;
+      if (version > 1) { toast(t('toast_import_version')); return; }
       const colls = ['daily','assess','meds'];
       const hasAny = colls.some(c => Array.isArray(data[c]) && data[c].length > 0);
       if(!hasAny){ toast(t('toast_import_invalid')); return; }
 
       const local = Store._all();
-      let added = 0;
+      let added = 0, skipped = 0;
       colls.forEach(coll => {
         if(!Array.isArray(data[coll])) return;
         const existing = new Set(local[coll].map(r => r.submission_id));
         data[coll].forEach(r => {
-          if(!r || !r.submission_id) return;
+          if (!_validateRecord(coll, r)) { skipped++; return; }
           if(r.entry_date) r.entry_date = Store._normalizeDate(r.entry_date);
           delete r._dirty;
           if(!existing.has(r.submission_id)){
@@ -1820,7 +1868,8 @@ function importJSON(input){
       refreshDueBanner();
       renderLog();
       updateSyncUI();
-      toast(t('toast_import_done', { n: added }));
+      const msg = t('toast_import_done', { n: added }) + (skipped ? ' · ' + t('toast_import_skipped', { n: skipped }) : '');
+      toast(msg);
       Store.syncQueue();
     } catch(err) {
       console.error('Import failed', err);
