@@ -407,7 +407,7 @@ const Store = {
   everything(){ return this._all(); },
   exportClean(){
     const d = this._all();
-    ['daily','assess','meds'].forEach(c => d[c].forEach(r => delete r._dirty));
+    ['daily','assess','meds'].forEach(c => d[c].forEach(r => { delete r._dirty; delete r._dirty_fields; }));
     d.version = 1;
     return d;
   },
@@ -426,6 +426,28 @@ const Store = {
 
   put(coll, record) {
     const d = this._all();
+    const existing = d[coll].find(r => r.submission_id === record.submission_id);
+    const now = Date.now();
+    const fts = Object.assign({}, (existing && existing._field_ts) || {}, record._field_ts || {});
+    // Accumulate dirty fields: preserve previously dirty + detect new changes
+    const prevDirty = (existing && existing._dirty && existing._dirty_fields) || [];
+    const dirtySet = {};
+    prevDirty.forEach(function(f){ dirtySet[f] = true; });
+    const fields = _MUTABLE_FIELDS[coll] || [];
+    if(!existing){
+      // New record — all populated fields are dirty
+      fields.forEach(function(f){ dirtySet[f] = true; if(!fts[f]) fts[f] = now; });
+    } else {
+      // Existing — detect which fields actually changed
+      fields.forEach(function(f){
+        if(JSON.stringify(existing[f]) !== JSON.stringify(record[f])){
+          dirtySet[f] = true;
+          fts[f] = now;
+        }
+      });
+    }
+    record._field_ts = fts;
+    record._dirty_fields = Object.keys(dirtySet);
     record._dirty = true;
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
@@ -565,21 +587,30 @@ const Store = {
       for (const coll of ['daily','assess','meds']) {
         if (!d[coll].some(r => r._dirty)) continue;
         try {
-          // Read-before-write: merge cloud state with local to prevent cross-device data loss
+          // Read-before-write + field-level merge to prevent cross-device data loss
           const cloud = await SheetsSync.read(coll);
           const bySub = {};
           cloud.forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
           d[coll].forEach(r => {
-            if (r && r.submission_id) {
+            if (!r || !r.submission_id) return;
+            const cloudRec = bySub[r.submission_id];
+            if (!r._dirty || !cloudRec) {
+              // Not dirty: keep cloud version if exists, else add local
+              // Dirty but new (no cloud): add local wholesale
               const c = Object.assign({}, r);
-              delete c._dirty;
-              bySub[c.submission_id] = c;  // local always wins (dirty or not — we have latest local state)
+              delete c._dirty; delete c._dirty_fields;
+              bySub[c.submission_id] = c;
+            } else {
+              // Dirty + cloud exists: field-level merge
+              const m = _fieldMerge(cloudRec, r);
+              delete m._dirty; delete m._dirty_fields;
+              bySub[m.submission_id] = m;
             }
           });
           const merged = Object.values(bySub).sort((a, b) =>
             String(a.submission_id).localeCompare(String(b.submission_id)));
           await SheetsSync.write(coll, merged);
-          d[coll].forEach(r => { r._dirty = false; });
+          d[coll].forEach(r => { r._dirty = false; delete r._dirty_fields; });
           updated = true;
           _syncError = false;
         } catch(e) {
@@ -617,14 +648,25 @@ const Store = {
         return;
       }
 
-      // Normal merge: cloud as base, local dirty wins
+      // Normal merge: cloud as base, local dirty fields win per timestamp
       const local = this._all();
       const merged = {};
       ['daily','assess','meds'].forEach(coll => {
         const bySub = {};
         (cloud[coll] || []).forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
         (local[coll] || []).forEach(r => {
-          if (r && r._dirty && r.submission_id) bySub[r.submission_id] = r;
+          if (!r || !r.submission_id) return;
+          if (!r._dirty) return; // not dirty — cloud version wins
+          const cloudRec = bySub[r.submission_id];
+          if (!cloudRec) {
+            bySub[r.submission_id] = r; // no cloud version — keep local
+          } else {
+            // Field-level merge: local dirty fields win if timestamp is newer
+            const m = _fieldMerge(cloudRec, r);
+            m._dirty = true;
+            m._dirty_fields = r._dirty_fields;
+            bySub[m.submission_id] = m;
+          }
         });
         merged[coll] = Object.values(bySub).sort((a, b) =>
           String(a.submission_id).localeCompare(String(b.submission_id)));
@@ -876,14 +918,37 @@ function _cyclePersistMode(){
   _updatePersistBtn();
 }
 
+// ---- Field-level merge helpers ----
+const _MUTABLE_FIELDS = {
+  daily: ['backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
+  assess: ['phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
+  meds: ['backfilled','entries']
+};
+
+function _fieldMerge(cloud, local){
+  const merged = Object.assign({}, cloud);
+  const dirty = local._dirty_fields || [];
+  const lt = local._field_ts || {};
+  const ct = cloud._field_ts || {};
+  const mt = Object.assign({}, ct);
+  dirty.forEach(function(f){
+    if((lt[f] || 0) >= (ct[f] || 0)){
+      merged[f] = local[f];
+      mt[f] = lt[f] || 0;
+    }
+  });
+  merged._field_ts = mt;
+  return merged;
+}
+
 // ---- Sheets API Sync ----
 const SheetsSync = {
   SCHEMA: {
-    daily: ['submission_id','entry_date','backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
-    assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
-    meds: ['submission_id','entry_date','backfilled','entries']
+    daily: ['submission_id','entry_date','backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
+    assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty','_field_ts'],
+    meds: ['submission_id','entry_date','backfilled','entries','_field_ts']
   },
-  JSON_FIELDS: { daily:['body_sensations'], assess:['phq9_items','gad7_items'], meds:['entries'] },
+  JSON_FIELDS: { daily:['body_sensations','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
   NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
   BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
   NULLABLE: ['sleep_wakes'],
@@ -1931,6 +1996,7 @@ function _validateRecord(coll, r) {
   if (!r || typeof r !== 'object') return false;
   if (typeof r.submission_id !== 'string' || !r.submission_id) return false;
   if (r.entry_date && !/^\d{4}-\d{2}-\d{2}$/.test(Store._normalizeDate(r.entry_date))) return false;
+  if (r._field_ts !== undefined && (typeof r._field_ts !== 'object' || Array.isArray(r._field_ts))) return false;
   if (coll === 'daily') {
     if (r.valence !== undefined && typeof r.valence !== 'number') return false;
     if (r.body_sensations !== undefined && !Array.isArray(r.body_sensations)) return false;
