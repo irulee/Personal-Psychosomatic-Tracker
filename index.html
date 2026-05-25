@@ -373,6 +373,8 @@ input[type=range].valence::-moz-range-thumb {
   <div class="export-row">
     <button type="button" class="btn-ghost" onclick="exportJSON()" data-i18n="export_json">Export JSON</button>
     <button type="button" class="btn-ghost" onclick="exportCSV()" data-i18n="export_csv">Export CSV</button>
+    <button type="button" class="btn-ghost" onclick="$('#importFile').click()" data-i18n="import_json">Import JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
   </div>
   <div id="logList"></div>
 </section>
@@ -693,17 +695,17 @@ const GoogleAuth = {
 
   async _fetchEmail() {
     try {
-      var r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': 'Bearer ' + this.token }
       });
-      if (r.ok) { var info = await r.json(); this.userEmail = info.email || null; if(this.userEmail) localStorage.setItem('monitor_auth_email', this.userEmail); updateAuthUI(); }
+      if (r.ok) { const info = await r.json(); this.userEmail = info.email || null; if(this.userEmail) localStorage.setItem('monitor_auth_email', this.userEmail); updateAuthUI(); }
     } catch(e) {}
   },
 
   signIn() {
     if (!this.tokenClient) this.init();
     if (!this.tokenClient) { toast('Google Sign-In not available'); return; }
-    var isReturning = localStorage.getItem('monitor_auth_mode') === 'google';
+    const isReturning = localStorage.getItem('monitor_auth_mode') === 'google';
     this.tokenClient.requestAccessToken({ prompt: isReturning ? '' : 'consent' });
   },
 
@@ -730,13 +732,13 @@ const GoogleAuth = {
     if (!this.token) throw new Error('Not signed in');
     // Proactive token refresh if expiry is within 5 minutes
     if (this.tokenExpiry && Date.now() > this.tokenExpiry - 300000) {
-      var savedToken = this.token;
+      const savedToken = this.token;
       try { await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this)); }
       catch(e) { if (!this.token) this.token = savedToken; }
     }
     opts = opts || {};
     opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + this.token });
-    var res = await fetch(url, opts);
+    let res = await fetch(url, opts);
     if (res.status === 401) {
       await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this));
       if (!this.token) throw new Error('Token refresh failed');
@@ -763,7 +765,7 @@ const SheetsSync = {
   get id() { return localStorage.getItem('monitor_sheets_id'); },
   set id(v) { localStorage.setItem('monitor_sheets_id', v); },
 
-  _col: function(n) { var s=''; while(n>0){ n--; s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26); } return s; },
+  _col: function(n) { let s=''; while(n>0){ n--; s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26); } return s; },
 
   _ensuring: null,
   async ensure() {
@@ -775,12 +777,12 @@ const SheetsSync = {
   async _doEnsure() {
     if (this.id) {
       try {
-        var r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId');
+        const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId');
         if (r.ok) return this.id;
       } catch(e) {}
       localStorage.removeItem('monitor_sheets_id');
     }
-    var body = {
+    const body = {
       properties: { title: 'PPT Monitor Data' },
       sheets: ['daily','assess','meds'].map(function(name) {
         return {
@@ -791,37 +793,37 @@ const SheetsSync = {
         };
       })
     };
-    var r2 = await GoogleAuth.authFetch(this.BASE, {
+    const r2 = await GoogleAuth.authFetch(this.BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (!r2.ok) throw new Error('Create spreadsheet failed: ' + r2.status);
-    var data = await r2.json();
+    const data = await r2.json();
     this.id = data.spreadsheetId;
     return this.id;
   },
 
   async read(sheet) {
     if (!this.id) return [];
-    var cols = this.SCHEMA[sheet].length;
-    var r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(cols));
+    const cols = this.SCHEMA[sheet].length;
+    const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(cols));
     if (!r.ok) return [];
-    var data = await r.json();
-    var rows = data.values || [];
+    const data = await r.json();
+    const rows = data.values || [];
     if (rows.length < 2) return [];
-    var schema = this.SCHEMA[sheet];
-    var jf = this.JSON_FIELDS[sheet] || [];
-    var self = this;
+    const schema = this.SCHEMA[sheet];
+    const jf = this.JSON_FIELDS[sheet] || [];
+    const self = this;
     return rows.slice(1).map(function(row) {
-      var obj = {};
+      const obj = {};
       schema.forEach(function(f, i) {
-        var v = i < row.length ? row[i] : '';
+        let v = i < row.length ? row[i] : '';
         if (jf.indexOf(f) >= 0 && typeof v === 'string' && v) { try { v = JSON.parse(v); } catch(e){} }
         else if (self.BOOLEAN.indexOf(f) >= 0) { v = v === 'true'; }
         else if (self.NUMERIC.indexOf(f) >= 0) {
           if (v === '' || v === 'null') v = self.NULLABLE.indexOf(f) >= 0 ? null : 0;
-          else { var n = Number(v); v = isNaN(n) ? v : n; }
+          else { const n = Number(v); v = isNaN(n) ? v : n; }
         }
         else if (v === 'null') { v = self.NULLABLE.indexOf(f) >= 0 ? null : ''; }
         if (f === 'entry_date') v = Store._normalizeDate(v);
@@ -832,13 +834,13 @@ const SheetsSync = {
   },
 
   async write(sheet, records) {
-    var sid = await this.ensure();
-    var schema = this.SCHEMA[sheet];
-    var jf = this.JSON_FIELDS[sheet] || [];
-    var rows = [schema];
+    const sid = await this.ensure();
+    const schema = this.SCHEMA[sheet];
+    const jf = this.JSON_FIELDS[sheet] || [];
+    const rows = [schema];
     records.forEach(function(rec) {
       rows.push(schema.map(function(f) {
-        var v = rec[f];
+        const v = rec[f];
         if (v === undefined || v === null) return '';
         if (jf.indexOf(f) >= 0) return JSON.stringify(v);
         return String(v);
@@ -846,8 +848,8 @@ const SheetsSync = {
     });
     await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + sheet + ':clear',
       { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
-    var range = sheet + '!A1:' + this._col(schema.length) + rows.length;
-    var r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
+    const range = sheet + '!A1:' + this._col(schema.length) + rows.length;
+    const r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
       { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ values: rows }) });
     if (!r.ok) throw new Error('Write failed: ' + r.status);
   }
@@ -897,11 +899,11 @@ function updateSyncUI(){
 }
 
 function updateAuthUI(){
-  var isSignedIn = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
-  var brandBtn = $('#brandBtn');
-  var sep = $('#authSep');
-  var signInBtn = $('#googleSignIn');
-  var userArea = $('#googleUser');
+  const isSignedIn = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const brandBtn = $('#brandBtn');
+  const sep = $('#authSep');
+  const signInBtn = $('#googleSignIn');
+  const userArea = $('#googleUser');
   if(isSignedIn){
     if(brandBtn) brandBtn.style.display = 'none';
     if(sep) sep.style.display = 'none';
@@ -915,7 +917,7 @@ function updateAuthUI(){
     if(sep) sep.style.display = '';
     if(signInBtn){
       signInBtn.style.display = '';
-      var savedEmail = localStorage.getItem('monitor_auth_email');
+      const savedEmail = localStorage.getItem('monitor_auth_email');
       if(savedEmail && localStorage.getItem('monitor_auth_mode') === 'google'){
         signInBtn.textContent = savedEmail;
       } else {
@@ -959,7 +961,8 @@ const I18N = {
   log_date:{en:'Log date',zh:'紀錄日期'}, quick_entry:{en:'Quick entry',zh:'快速輸入'}, medication:{en:'Medication',zh:'藥物'},
   log_intake:{en:'Log intake',zh:'記錄服用'}, todays_ledger:{en:"Today's ledger",zh:'今日流水'},
   log_head:{en:'Log',zh:'紀錄'}, log_sub:{en:'recent entries · newest first',zh:'近期紀錄 · 新到舊'},
-  export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'},
+  export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'}, import_json:{en:'Import JSON',zh:'匯入 JSON'},
+  toast_import_done:{en:'{n} record(s) imported',zh:'已匯入 {n} 筆紀錄'}, toast_import_invalid:{en:'Invalid file — expected JSON export',zh:'無效檔案 — 需為 JSON 匯出格式'},
   field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
   field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
   field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
@@ -1494,7 +1497,7 @@ function refreshDueBanner(){
     return;
   }
   const last = dates[0];
-  const days = Math.floor((new Date(todayISO()) - new Date(last)) / 86400000);
+  const days = Math.round((new Date(todayISO() + 'T12:00:00') - new Date(last + 'T12:00:00')) / 86400000);
   if(days>=14){
     banner.className='due-banner';
     banner.textContent=t('due_reached',{date:fmtDate(last)});
@@ -1759,6 +1762,54 @@ function exportCSV(){
   dl(new Blob([csv],{type:'text/csv'}), `monitor_export_${todayISO()}.csv`);
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+
+function importJSON(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = JSON.parse(e.target.result);
+      if(!data || typeof data !== 'object'){ toast(t('toast_import_invalid')); return; }
+      const colls = ['daily','assess','meds'];
+      const hasAny = colls.some(c => Array.isArray(data[c]) && data[c].length > 0);
+      if(!hasAny){ toast(t('toast_import_invalid')); return; }
+
+      const local = Store._all();
+      let added = 0;
+      colls.forEach(coll => {
+        if(!Array.isArray(data[coll])) return;
+        const existing = new Set(local[coll].map(r => r.submission_id));
+        data[coll].forEach(r => {
+          if(!r || !r.submission_id) return;
+          if(r.entry_date) r.entry_date = Store._normalizeDate(r.entry_date);
+          delete r._dirty;
+          if(!existing.has(r.submission_id)){
+            r._dirty = true;
+            local[coll].push(r);
+            added++;
+          }
+        });
+      });
+
+      Store._commit(local);
+      rebuildAssessItems();
+      loadDaily($('#d_date').value || todayISO());
+      loadAssess($('#a_date').value || todayISO());
+      loadMeds($('#m_date').value || todayISO());
+      refreshDueBanner();
+      renderLog();
+      updateSyncUI();
+      toast(t('toast_import_done', { n: added }));
+      Store.syncQueue();
+    } catch(err) {
+      console.error('Import failed', err);
+      toast(t('toast_import_invalid'));
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
 
 $('#brandBtn').addEventListener('click', ()=>{
   const url = prompt('Enter Google Apps Script Sync URL:');
