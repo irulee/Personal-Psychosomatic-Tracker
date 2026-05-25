@@ -178,6 +178,8 @@ input[type=range].valence::-moz-range-thumb {
 .auth-user { font-size: 11px; color: var(--ink-soft); display: flex; align-items: baseline; gap: 6px; }
 .btn-signout { background: none; border: none; font-family: var(--mono); font-size: 10px; color: var(--mid); text-decoration: underline; cursor: pointer; padding: 0; letter-spacing: 0.03em; }
 .btn-signout:hover { color: var(--ink); }
+.btn-persist { background: none; border: 1px solid var(--line); padding: 2px 7px; font-family: var(--mono); font-size: 9px; color: var(--mid); cursor: pointer; letter-spacing: 0.04em; border-radius: 0; }
+.btn-persist:hover { border-color: var(--ink); color: var(--ink); }
 .btn-signin { background: var(--field); border: 1px solid var(--line-strong); padding: 4px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; letter-spacing: 0.03em; }
 .btn-signin:hover { background: var(--ink); color: var(--bg); }
 </style>
@@ -193,6 +195,8 @@ input[type=range].valence::-moz-range-thumb {
         <button type="button" id="googleSignIn" class="btn-signin" data-i18n="auth_signin">Sign in with Google</button>
         <span id="googleUser" class="auth-user" style="display:none;">
           <span id="googleEmail"></span>
+          <button type="button" id="googlePersist" class="btn-persist" title="Session persistence">session</button>
+          <span class="auth-sep">·</span>
           <button type="button" id="googleSignOut" class="btn-signout" data-i18n="auth_signout">Sign out</button>
         </span>
       </div>
@@ -426,6 +430,11 @@ const Store = {
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
     this._commit(d);
+
+    // Touch idle timer for 30d persist mode
+    if(typeof _getPersistMode === 'function' && _getPersistMode() === '30d'){
+      localStorage.setItem(_ACTIVE_KEY, String(Date.now()));
+    }
 
     if (typeof updateSyncUI === 'function') updateSyncUI();
     this.syncQueue();
@@ -718,6 +727,7 @@ const GoogleAuth = {
       updateSyncUI();
       Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
     }
+    if(typeof _saveToken === 'function') _saveToken();
   },
 
   async _fetchEmail() {
@@ -749,6 +759,7 @@ const GoogleAuth = {
     localStorage.removeItem('monitor_auth_mode');
     localStorage.removeItem('monitor_auth_email');
     localStorage.removeItem('monitor_sheets_id');
+    if(typeof _clearTokenStorage === 'function') _clearTokenStorage();
     updateAuthUI();
     updateSyncUI();
   },
@@ -780,6 +791,87 @@ const GoogleAuth = {
     return res;
   }
 };
+
+// ---- Token Persistence ----
+const _PERSIST_KEY  = 'monitor_persist_mode';
+const _TOKEN_STORE  = 'monitor_saved_token';
+const _ACTIVE_KEY   = 'monitor_last_active';
+const _IDLE_MS      = 30 * 86400000; // 30 days
+
+function _getPersistMode(){ return localStorage.getItem(_PERSIST_KEY) || 'session'; }
+
+function _saveToken(){
+  if(!GoogleAuth.token) return;
+  const mode = _getPersistMode();
+  const blob = JSON.stringify({ t: GoogleAuth.token, e: GoogleAuth.tokenExpiry });
+  if(mode === 'session'){
+    sessionStorage.setItem(_TOKEN_STORE, blob);
+    localStorage.removeItem(_TOKEN_STORE);
+  } else {
+    localStorage.setItem(_TOKEN_STORE, blob);
+    sessionStorage.removeItem(_TOKEN_STORE);
+    if(mode === '30d') localStorage.setItem(_ACTIVE_KEY, String(Date.now()));
+  }
+}
+
+function _restoreToken(){
+  const mode = _getPersistMode();
+  if(mode === '30d'){
+    const la = parseInt(localStorage.getItem(_ACTIVE_KEY) || '0');
+    if(la && Date.now() - la > _IDLE_MS){ _clearTokenStorage(); return false; }
+  }
+  const raw = mode === 'session' ? sessionStorage.getItem(_TOKEN_STORE) : localStorage.getItem(_TOKEN_STORE);
+  if(!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    if(!d || !d.t) return false;
+    // Token still valid (>1 min remaining) — restore directly
+    if(d.e && Date.now() < d.e - 60000){
+      GoogleAuth.token = d.t;
+      GoogleAuth.tokenExpiry = d.e;
+      _authExpired = false;
+      localStorage.setItem('monitor_auth_mode', 'google');
+      GoogleAuth._fetchEmail();
+      updateAuthUI();
+      updateSyncUI();
+      Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+      return true;
+    }
+    // Expired — signal caller to try silent refresh
+    return 'refresh';
+  } catch(e){ return false; }
+}
+
+function _clearTokenStorage(){
+  sessionStorage.removeItem(_TOKEN_STORE);
+  localStorage.removeItem(_TOKEN_STORE);
+  localStorage.removeItem(_ACTIVE_KEY);
+}
+
+function _updatePersistBtn(){
+  const btn = $('#googlePersist');
+  if(!btn) return;
+  const mode = _getPersistMode();
+  const labels = { session:'session', '30d':'30d', forever:'∞' };
+  btn.textContent = labels[mode] || 'session';
+  const tips = {
+    session:{ en:'Survives refresh; logs out on tab close', zh:'重新整理後保留；關閉分頁後登出' },
+    '30d':{ en:'Stay signed in for 30 days of activity', zh:'活動期間保持登入 30 天' },
+    forever:{ en:'Stay signed in until manual sign-out', zh:'保持登入直到手動登出' }
+  };
+  const tip = tips[mode] || tips.session;
+  btn.title = tip[currentLang] || tip.en;
+}
+
+function _cyclePersistMode(){
+  const order = ['session','30d','forever'];
+  const cur = _getPersistMode();
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  _clearTokenStorage();
+  localStorage.setItem(_PERSIST_KEY, next);
+  _saveToken();
+  _updatePersistBtn();
+}
 
 // ---- Sheets API Sync ----
 const SheetsSync = {
@@ -940,6 +1032,11 @@ function updateSyncUI(){
     el.textContent = syncLabel('syncing', { n });
     el.style.color = 'var(--pos)';
   }
+  // Append sync pathway suffix
+  if(hasBackend && !_authExpired){
+    const via = isGoogle ? (currentLang === 'zh' ? ' · Google' : ' · Google') : (currentLang === 'zh' ? ' · 端點' : ' · Endpoint');
+    el.textContent = el.textContent.replace(/\s*\]$/, via + ' ]');
+  }
 }
 
 function updateAuthUI(){
@@ -956,6 +1053,7 @@ function updateAuthUI(){
       userArea.style.display = '';
       $('#googleEmail').textContent = GoogleAuth.userEmail || '...';
     }
+    if(typeof _updatePersistBtn === 'function') _updatePersistBtn();
   } else {
     if(brandBtn) brandBtn.style.display = '';
     if(sep) sep.style.display = '';
@@ -1894,6 +1992,7 @@ $('#brandBtn').addEventListener('click', ()=>{
 
 $('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
 $('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
+$('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
 
 window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud(); Store.syncQueue(); });
 window.addEventListener('offline', updateSyncUI);
@@ -1902,6 +2001,17 @@ let _gisAttempts = 0;
 function _waitForGIS(){
   if(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2){
     GoogleAuth.init();
+    // Attempt to restore saved token on page load
+    const restored = _restoreToken();
+    if(restored === true){
+      // Token was valid — already signed in
+      updateAuthUI();
+      return;
+    }
+    if(restored === 'refresh'){
+      // Token expired — try silent refresh
+      GoogleAuth.trySilentSignIn();
+    }
     updateAuthUI();
   } else if(++_gisAttempts < 25){
     setTimeout(_waitForGIS, 200);
