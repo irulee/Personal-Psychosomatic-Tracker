@@ -805,8 +805,12 @@ const GoogleAuth = {
     localStorage.removeItem('monitor_auth_email');
     localStorage.removeItem('monitor_sheets_id');
     if(typeof _clearTokenStorage === 'function') _clearTokenStorage();
+    // Clear local data and re-render clean slate
+    Store._commit({daily:[],assess:[],meds:[]});
+    _syncError = false;
     updateAuthUI();
     updateSyncUI();
+    if(typeof _resetViews === 'function') _resetViews();
   },
 
   get isSignedIn() { return !!this.token; },
@@ -932,7 +936,23 @@ function _fieldMerge(cloud, local){
   const ct = cloud._field_ts || {};
   const mt = Object.assign({}, ct);
   dirty.forEach(function(f){
-    if((lt[f] || 0) >= (ct[f] || 0)){
+    // Element-level merge for arrays of objects with id (e.g. entries)
+    if(f === 'entries' && Array.isArray(merged[f]) && Array.isArray(local[f])){
+      const byId = {};
+      (merged[f] || []).forEach(function(e){
+        if(!e) return;
+        if(!e.id) e.id = Math.random().toString(36).slice(2,8); // migration
+        byId[e.id] = e;
+      });
+      (local[f] || []).forEach(function(e){
+        if(!e) return;
+        if(!e.id) e.id = Math.random().toString(36).slice(2,8); // migration
+        var existing = byId[e.id];
+        if(!existing || (e._ts || 0) >= (existing._ts || 0)) byId[e.id] = e;
+      });
+      merged[f] = Object.values(byId);
+      mt[f] = Math.max(lt[f] || 0, ct[f] || 0);
+    } else if((lt[f] || 0) >= (ct[f] || 0)){
       merged[f] = local[f];
       mt[f] = lt[f] || 0;
     }
@@ -1123,10 +1143,21 @@ function updateAuthUI(){
     }
     if(typeof _updatePersistBtn === 'function') _updatePersistBtn();
   } else {
-    if(brandBtn) brandBtn.style.display = '';
-    if(sep) sep.style.display = '';
+    if(brandBtn){
+      brandBtn.style.display = '';
+      if(Store.endpoint){
+        brandBtn.textContent = t('auth_disconnect');
+        brandBtn.style.color = '#2a7d4f';
+        brandBtn.style.textDecorationColor = '#2a7d4f';
+      } else {
+        brandBtn.textContent = t('auth_endpoint');
+        brandBtn.style.color = 'var(--ink-soft)';
+        brandBtn.style.textDecorationColor = 'var(--line)';
+      }
+    }
+    if(sep) sep.style.display = Store.endpoint ? 'none' : '';
     if(signInBtn){
-      signInBtn.style.display = '';
+      signInBtn.style.display = Store.endpoint ? 'none' : '';
       const savedEmail = localStorage.getItem('monitor_auth_email');
       if(savedEmail && localStorage.getItem('monitor_auth_mode') === 'google'){
         signInBtn.textContent = savedEmail;
@@ -1208,7 +1239,10 @@ const I18N = {
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
+  confirm_disconnect_endpoint:{en:'Disconnect from endpoint and clear local data?',zh:'中斷端點連線並清除本機資料？'},
+  toast_disconnected:{en:'Disconnected',zh:'已中斷連線'},
   auth_endpoint:{en:'Endpoint URL',zh:'端點 URL'},
+  auth_disconnect:{en:'Disconnect endpoint',zh:'中斷端點'},
   auth_or:{en:'or',zh:'或'},
   auth_signin:{en:'Sign in with Google',zh:'使用 Google 登入'},
   auth_signout:{en:'Sign out',zh:'登出'},
@@ -1770,7 +1804,7 @@ function collectQuickMedEntry(){
   const medId = $('#med_selector').value;
   if(!medId) return null;
   const med = MED_TEMPLATES.find(m=>m.id===medId);
-  const obj = { medication: med.id, med_name: med.name };
+  const obj = { medication: med.id, med_name: med.name, id: Math.random().toString(36).slice(2,8), _ts: Date.now() };
   let hasData = false;
   med.fields.forEach(f=>{
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
@@ -1797,6 +1831,7 @@ function persistMedsRecord(rec){
     Store.deleteBySubmission('meds', rec.submission_id);
     return;
   }
+  // Keep record even if all entries are tombstoned (needed for sync)
   Store.put('meds', rec);
 }
 
@@ -1822,11 +1857,12 @@ function logIntake(){
   });
 }
 
-function removeMedEntry(idx){
+function removeMedEntry(entryId){
   const date = $('#m_date').value;
   const rec = getMedsRecord(date, false);
   if(!rec) return;
-  rec.entries.splice(idx, 1);
+  const entry = rec.entries.find(function(e){ return e.id === entryId; });
+  if(entry){ entry._deleted = true; entry._ts = Date.now(); }
   persistMedsRecord(rec);
   renderMedLedger();
   updateMedsSub();
@@ -1845,27 +1881,30 @@ function medLineDisplay(m){
   return parts.map(p=>esc(String(p))).join(' · ');
 }
 
+function _activeEntries(arr){ return (arr || []).filter(function(e){ return e && !e._deleted; }); }
+
 function renderMedLedger(){
   const host = $('#med_ledger');
   const date = $('#m_date').value;
   const rec = date ? Store.getByDate('meds', date) : null;
-  const entries = rec && rec.entries ? rec.entries : [];
-  if(!entries.length){
+  const active = _activeEntries(rec && rec.entries);
+  if(!active.length){
     host.innerHTML = `<div class="empty">${esc(t('ledger_empty'))}</div>`;
     return;
   }
-  host.innerHTML = entries.map((e,i)=>`
-    <div class="med-ledger-item">
+  host.innerHTML = active.map(function(e){
+    return `<div class="med-ledger-item">
       <span>${medLineDisplay(e)}</span>
-      <button type="button" class="btn-rm-ledger" onclick="removeMedEntry(${i})" aria-label="remove">×</button>
-    </div>`).join('');
+      <button type="button" class="btn-rm-ledger" onclick="removeMedEntry('${e.id}')" aria-label="remove">×</button>
+    </div>`;
+  }).join('');
 }
 
 function updateMedsSub(){
   const date = $('#m_date').value;
   const ex = date && Store.getByDate('meds', date);
-  const n = ex && ex.entries ? ex.entries.length : 0;
-  $('#medsSub').textContent = ex ? t('meds_sub_onfile', {date: fmtDate(date), n}) : t('meds_sub');
+  const n = ex ? _activeEntries(ex.entries).length : 0;
+  $('#medsSub').textContent = ex && n ? t('meds_sub_onfile', {date: fmtDate(date), n}) : t('meds_sub');
 }
 
 function loadMeds(date){
@@ -1894,11 +1933,12 @@ const _LOG_PAGE = 50;
 let _logLimit = _LOG_PAGE;
 
 function _renderDateHTML(date, e){
+  const medEntries = e.meds ? _activeEntries(e.meds.entries) : [];
   const tags=[];
   if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
   if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
-  if(e.meds && e.meds.entries && e.meds.entries.length)
-    tags.push(`${e.meds.entries.length} ${t('log_med_entries')}`);
+  if(medEntries.length)
+    tags.push(`${medEntries.length} ${t('log_med_entries')}`);
   const valTag = tags.join(' · ') || '—';
   let body='<dl>';
   if(e.daily){
@@ -1929,15 +1969,15 @@ function _renderDateHTML(date, e){
     body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
     if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
   }
-  if(e.meds && e.meds.entries.length){
-    const lines = e.meds.entries.map(medLineHTML).join('<br>');
+  if(medEntries.length){
+    const lines = medEntries.map(medLineHTML).join('<br>');
     body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
   }
   body+='</dl>';
   const edits=[];
   if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
   if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
-  if(e.meds && e.meds.entries && e.meds.entries.length)
+  if(medEntries.length)
     edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
   const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
   const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
@@ -1983,7 +2023,7 @@ function exportCSV(){
   const all=Store.exportClean(); const rows=[['collection','entry_date','submission_id','field','value']];
   ['daily','assess','meds'].forEach(coll=>all[coll].forEach(r=>{
     Object.entries(r).forEach(([k,v])=>{
-      if(['entry_date','submission_id'].includes(k))return;
+      if(k === 'entry_date' || k === 'submission_id' || k.charAt(0) === '_')return;
       rows.push([coll, r.entry_date, r.submission_id, k, typeof v==='object'?JSON.stringify(v):v]);
     });
   }));
@@ -2063,7 +2103,28 @@ function importJSON(input){
   input.value = '';
 }
 
+function _resetViews(){
+  rebuildAssessItems();
+  loadDaily(todayISO());
+  loadAssess(todayISO());
+  loadMeds(todayISO());
+  refreshDueBanner();
+  if($('#seg-log').classList.contains('active')) renderLog();
+}
+
 $('#brandBtn').addEventListener('click', ()=>{
+  // If already connected to an endpoint, offer to disconnect
+  if(Store.endpoint){
+    if(confirm(t('confirm_disconnect_endpoint'))){
+      localStorage.removeItem('monitor_endpoint');
+      Store._commit({daily:[],assess:[],meds:[]});
+      _syncError = false;
+      updateSyncUI();
+      _resetViews();
+      toast(t('toast_disconnected'));
+    }
+    return;
+  }
   const url = prompt('Enter Google Apps Script Sync URL:');
   if(url){
     const trimmed = url.trim();
