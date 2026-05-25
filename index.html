@@ -644,6 +644,9 @@ const Store = {
       }
     } catch(e) {
       console.error('Sheets hydration failed', e);
+      _syncError = true;
+      const detail = e && e.message ? ' (' + e.message + ')' : '';
+      toast(t('toast_sync_error') + detail);
     } finally {
       _hydrating = false; if (typeof updateSyncUI === 'function') updateSyncUI();
     }
@@ -1133,6 +1136,7 @@ const I18N = {
   log_backfilled:{en:'backfilled',zh:'補登'}, log_valence:{en:'valence',zh:'效價'},
   log_med_entries:{en:'med entries',zh:'用藥筆數'}, log_edit_daily:{en:'edit daily',zh:'編輯每日'}, log_edit_assess:{en:'edit assessment',zh:'編輯評估'},
   log_edit_meds:{en:'edit meds',zh:'編輯用藥'}, log_empty:{en:'No entries yet.',zh:'尚無紀錄。'},
+  log_show_more:{en:'Show more ({n} remaining)',zh:'顯示更多（剩餘 {n} 筆）'},
   due_none:{en:'No assessment on record yet — the first one establishes your baseline.',zh:'尚無評估紀錄 — 第一次將建立基準。'},
   due_reached:{en:'Due — last completed {date}. Biweekly target reached.',zh:'到期 — 上次完成 {date}。已達雙週目標。'},
   due_countdown:{en:'Last assessment {days} day(s) ago ({date}). Next due in {left} day(s).',zh:'上次評估 {days} 天前（{date}）。{left} 天後到期。'},
@@ -1394,7 +1398,7 @@ function switchSeg(seg){
   $$('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.seg===seg));
   $$('.seg').forEach(x=>x.classList.remove('active'));
   $('#seg-'+seg).classList.add('active');
-  if(seg==='log') renderLog();
+  if(seg==='log'){ _logLimit = _LOG_PAGE; renderLog(); }
   if(seg==='assess') refreshDueBanner();
   if(seg==='meds') renderMedLedger();
 }
@@ -1821,6 +1825,60 @@ function editFromLog(date, coll){
   toast(`${t('toast_editing')} ${t('tab_'+coll)} · ${fmtDate(date)}`);
 }
 
+const _LOG_PAGE = 50;
+let _logLimit = _LOG_PAGE;
+
+function _renderDateHTML(date, e){
+  const tags=[];
+  if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
+  if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
+  if(e.meds && e.meds.entries && e.meds.entries.length)
+    tags.push(`${e.meds.entries.length} ${t('log_med_entries')}`);
+  const valTag = tags.join(' · ') || '—';
+  let body='<dl>';
+  if(e.daily){
+    const d=e.daily;
+    body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
+    if(d.body_sensations&&d.body_sensations.length){
+      const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
+        + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
+        + (d.body_other ? ` · ${esc(d.body_other)}` : '');
+      body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
+    }
+    if(d.sleep_bedtime || d.sleep_wake_time){
+      let sleepTxt = '';
+      if(d.sleep_bedtime) sleepTxt += `bed ${esc(extractTime(d.sleep_bedtime))}`;
+      if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
+      if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
+      if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
+      if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
+      body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
+    }
+    if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
+    if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
+  }
+  if(e.assess){
+    const a=e.assess;
+    const inc = ' · ' + t('log_incomplete');
+    body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${esc(t(phqSeverity(a.phq9_total)))})${a.phq9_complete?'':inc}</dd>`;
+    body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
+    if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
+  }
+  if(e.meds && e.meds.entries.length){
+    const lines = e.meds.entries.map(medLineHTML).join('<br>');
+    body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
+  }
+  body+='</dl>';
+  const edits=[];
+  if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
+  if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
+  if(e.meds && e.meds.entries && e.meds.entries.length)
+    edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
+  const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
+  const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
+  return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${esc(valTag)}</span></summary><div class="log-body">${body}${editRow}</div></details>`;
+}
+
 function renderLog(){
   const all = Store.everything();
   const byDate = {};
@@ -1833,59 +1891,20 @@ function renderLog(){
   const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   const list=$('#logList');
   if(!dates.length){ list.innerHTML=`<div class="empty">${esc(t('log_empty'))}</div>`; return; }
-  list.innerHTML = dates.map(date=>{
-    const e=byDate[date];
-    const tags=[];
-    if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
-    if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
-    if(e.meds && e.meds.entries && e.meds.entries.length)
-      tags.push(`${e.meds.entries.length} ${t('log_med_entries')}`);
-    const valTag = tags.join(' · ') || '—';
-    let body='<dl>';
-    if(e.daily){
-      const d=e.daily;
-      body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
-      if(d.body_sensations&&d.body_sensations.length){
-        const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
-          + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
-          + (d.body_other ? ` · ${esc(d.body_other)}` : '');
-        body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
-      }
-      if(d.sleep_bedtime || d.sleep_wake_time){
-        let sleepTxt = '';
-        if(d.sleep_bedtime) sleepTxt += `bed ${esc(extractTime(d.sleep_bedtime))}`;
-        if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
-        if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
-        if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
-        if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
-        body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
-      }
-      if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
-      if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
-    }
-    if(e.assess){
-      const a=e.assess;
-      const inc = ' · ' + t('log_incomplete');
-      body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${esc(t(phqSeverity(a.phq9_total)))})${a.phq9_complete?'':inc}</dd>`;
-      body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
-      if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
-    }
-    if(e.meds && e.meds.entries.length){
-      const lines = e.meds.entries.map(medLineHTML).join('<br>');
-      body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
-    }
-    body+='</dl>';
-    const edits=[];
-    if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
-    if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
-    if(e.meds && e.meds.entries && e.meds.entries.length)
-      edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
-    const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
-    const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
-    return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${esc(valTag)}</span></summary><div class="log-body">${body}${editRow}</div></details>`;
-  }).join('');
+  const visible = dates.slice(0, _logLimit);
+  const remaining = dates.length - visible.length;
+  let html = visible.map(date => _renderDateHTML(date, byDate[date])).join('');
+  if(remaining > 0){
+    html += `<button type="button" id="logShowMore" class="btn-ghost" style="width:100%;margin-top:12px;padding:10px;font-size:12px;letter-spacing:0.05em;">${t('log_show_more', { n: remaining })}</button>`;
+  }
+  list.innerHTML = html;
 }
 $('#logList').addEventListener('click', e=>{
+  if(e.target.id === 'logShowMore'){
+    _logLimit += _LOG_PAGE;
+    renderLog();
+    return;
+  }
   const btn = e.target.closest('.btn-log-edit');
   if(!btn) return;
   editFromLog(btn.dataset.date, btn.dataset.coll);
