@@ -562,7 +562,8 @@ const Store = {
         } catch(e) {
           console.error('Sheets sync failed for ' + coll, e);
           _syncError = true;
-          toast(t('toast_sync_error'));
+          const detail = e && e.message ? ' (' + e.message + ')' : '';
+          toast(t('toast_sync_error') + detail);
         } finally {
           if (typeof updateSyncUI === 'function') updateSyncUI();
         }
@@ -681,6 +682,16 @@ const GoogleAuth = {
     }
     this.token = resp.access_token;
     this.tokenExpiry = Date.now() + ((resp.expires_in || 3600) * 1000);
+    // Verify drive.file scope was granted (user may uncheck during consent)
+    const granted = resp.scope || '';
+    if (granted && granted.indexOf('drive.file') < 0) {
+      console.warn('drive.file scope not granted:', granted);
+      toast(t('toast_scope_missing'));
+      this.token = null;
+      if (this._refreshResolve) { this._refreshResolve(); this._refreshResolve = null; }
+      updateAuthUI();
+      return;
+    }
     this._fetchEmail();
     if (this._refreshResolve) {
       this._refreshResolve();
@@ -798,7 +809,11 @@ const SheetsSync = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (!r2.ok) throw new Error('Create spreadsheet failed: ' + r2.status);
+    if (!r2.ok) {
+      let errMsg = 'Create spreadsheet failed: ' + r2.status;
+      try { const errBody = await r2.json(); errMsg += ' — ' + (errBody.error && errBody.error.message || JSON.stringify(errBody.error || errBody)); } catch(e2) {}
+      throw new Error(errMsg);
+    }
     const data = await r2.json();
     this.id = data.spreadsheetId;
     return this.id;
@@ -851,7 +866,11 @@ const SheetsSync = {
     const range = sheet + '!A1:' + this._col(schema.length) + rows.length;
     const r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
       { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ values: rows }) });
-    if (!r.ok) throw new Error('Write failed: ' + r.status);
+    if (!r.ok) {
+      let errMsg = 'Write failed: ' + r.status;
+      try { const errBody = await r.json(); errMsg += ' — ' + (errBody.error && errBody.error.message || JSON.stringify(errBody.error || errBody)); } catch(e2) {}
+      throw new Error(errMsg);
+    }
   }
 };
 
@@ -979,6 +998,7 @@ const I18N = {
   toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
   toast_invalid_dose:{en:'Invalid dose (0–10 tablets)',zh:'無效劑量（0–10 錠）'},
   toast_sync_error:{en:'Sync error — will retry',zh:'同步錯誤 — 將重試'},
+  toast_scope_missing:{en:'Drive permission not granted — please sign in again and allow file access',zh:'未授予雲端硬碟權限 — 請重新登入並允許檔案存取'},
   daily_sub_onfile:{en:'entry on file for {date} — save will update',zh:'{date} 已有紀錄 — 儲存將更新'},
   assess_sub_onfile:{en:'assessment on file for {date} — save will update',zh:'{date} 已有評估 — 儲存將更新'},
   meds_sub_onfile:{en:'{n} intake(s) on file for {date}',zh:'{date} 已有 {n} 筆服用紀錄'},
