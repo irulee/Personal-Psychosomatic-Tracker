@@ -803,7 +803,7 @@ const GoogleAuth = {
     this.userEmail = null;
     localStorage.removeItem('monitor_auth_mode');
     localStorage.removeItem('monitor_auth_email');
-    localStorage.removeItem('monitor_sheets_id');
+    // Keep monitor_sheets_id so re-login reuses the same spreadsheet
     if(typeof _clearTokenStorage === 'function') _clearTokenStorage();
     // Clear local data and re-render clean slate
     Store._commit({daily:[],assess:[],meds:[]});
