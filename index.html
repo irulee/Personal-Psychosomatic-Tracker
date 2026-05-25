@@ -2109,7 +2109,8 @@ function _resetViews(){
   loadAssess(todayISO());
   loadMeds(todayISO());
   refreshDueBanner();
-  if($('#seg-log').classList.contains('active')) renderLog();
+  _logLimit = _LOG_PAGE;
+  renderLog();
 }
 
 $('#brandBtn').addEventListener('click', ()=>{
@@ -2119,6 +2120,7 @@ $('#brandBtn').addEventListener('click', ()=>{
       localStorage.removeItem('monitor_endpoint');
       Store._commit({daily:[],assess:[],meds:[]});
       _syncError = false;
+      updateAuthUI();
       updateSyncUI();
       _resetViews();
       toast(t('toast_disconnected'));
@@ -2131,6 +2133,7 @@ $('#brandBtn').addEventListener('click', ()=>{
     if(!/^https:\/\/.+/.test(trimmed)){ toast('URL must start with https://'); return; }
     localStorage.setItem('monitor_endpoint', trimmed);
   }
+  updateAuthUI();
   updateSyncUI();
   Store.hydrateFromCloud();
   Store.syncQueue();
