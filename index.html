@@ -440,8 +440,8 @@ const Store = {
   getByDate(coll, date){
     const d = this._all();
     const rec = d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
-    // Return a shallow clone to prevent callers from accidentally mutating the cache
-    return rec ? Object.assign({}, rec) : null;
+    // Deep-clone to fully isolate nested arrays (body_sensations, entries, phq9_items, etc.)
+    return rec ? structuredClone(rec) : null;
   },
   list(coll){ return this._all()[coll]; },
   everything(){ return this._all(); },
