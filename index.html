@@ -425,11 +425,18 @@ const Store = {
   _key: 'monitor_v1',
   get endpoint() { return localStorage.getItem('monitor_endpoint'); },
 
+  _cache: null,
   _all() {
-    try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
-    catch(e){ return {daily:[],assess:[],meds:[]}; }
+    if (this._cache) return this._cache;
+    try { this._cache = JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
+    catch(e){ this._cache = {daily:[],assess:[],meds:[]}; }
+    return this._cache;
   },
-  _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
+  _commit(d){
+    this._cache = d;
+    try { localStorage.setItem(this._key, JSON.stringify(d)); }
+    catch(e){ console.error('Storage write failed (quota/private mode)', e); toast('Storage full — data not saved'); }
+  },
   getByDate(coll, date){
     const d = this._all();
     return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
@@ -437,7 +444,7 @@ const Store = {
   list(coll){ return this._all()[coll]; },
   everything(){ return this._all(); },
   exportClean(){
-    const d = this._all();
+    const d = JSON.parse(JSON.stringify(this._all()));
     ['daily','assess','meds'].forEach(c => d[c].forEach(r => { delete r._dirty; delete r._dirty_fields; }));
     d.version = 1;
     return d;
@@ -490,7 +497,13 @@ const Store = {
     }
 
     if (typeof updateSyncUI === 'function') updateSyncUI();
-    this.syncQueue();
+    this._debouncedSync();
+  },
+
+  _syncTimer: null,
+  _debouncedSync() {
+    if (this._syncTimer) clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => { this._syncTimer = null; this.syncQueue(); }, 2000);
   },
 
   async syncQueue() {
@@ -599,7 +612,14 @@ const Store = {
       const after = JSON.stringify(merged);
       if (before !== after) {
         this._commit(merged);
-        location.reload();
+        // Re-render in place (no page reload — preserves form state)
+        rebuildAssessItems();
+        loadDaily($('#d_date').value || todayISO());
+        loadAssess($('#a_date').value || todayISO());
+        loadMeds($('#m_date').value || todayISO());
+        refreshDueBanner();
+        updateSyncUI();
+        renderI18n();
       }
     } catch (e) {
       console.error('Hydration failed', e);
@@ -625,8 +645,15 @@ const Store = {
           d[coll].forEach(r => {
             if (!r || !r.submission_id) return;
             const cloudRec = bySub[r.submission_id];
-            if (!r._dirty || !cloudRec) {
-              // Not dirty: keep cloud version if exists, else add local
+            if (!r._dirty) {
+              // Not dirty: cloud version wins if it exists; else keep local
+              if (!cloudRec) {
+                const c = Object.assign({}, r);
+                delete c._dirty; delete c._dirty_fields;
+                bySub[c.submission_id] = c;
+              }
+              // else: cloud already in bySub, skip stale local copy
+            } else if (!cloudRec) {
               // Dirty but new (no cloud): add local wholesale
               const c = Object.assign({}, r);
               delete c._dirty; delete c._dirty_fields;
@@ -961,6 +988,14 @@ const _MUTABLE_FIELDS = {
   meds: ['backfilled','entries']
 };
 
+// Deterministic ID for legacy entries lacking one — same content → same ID
+function _legacyEntryId(e, idx){
+  var key = (e.medication || '') + '|' + (e.time || '') + '|' + (e.taken_at || '') + '|' + (e.substance || '') + '|' + idx;
+  var h = 0;
+  for(var i = 0; i < key.length; i++){ h = ((h << 5) - h + key.charCodeAt(i)) | 0; }
+  return 'leg_' + (h >>> 0).toString(36);
+}
+
 function _fieldMerge(cloud, local){
   const merged = Object.assign({}, cloud);
   const dirty = local._dirty_fields || [];
@@ -971,14 +1006,14 @@ function _fieldMerge(cloud, local){
     // Element-level merge for arrays of objects with id (e.g. entries)
     if(f === 'entries' && Array.isArray(merged[f]) && Array.isArray(local[f])){
       const byId = {};
-      (merged[f] || []).forEach(function(e){
+      (merged[f] || []).forEach(function(e, idx){
         if(!e) return;
-        if(!e.id) e.id = Math.random().toString(36).slice(2,8); // migration
+        if(!e.id) e.id = _legacyEntryId(e, idx);
         byId[e.id] = e;
       });
-      (local[f] || []).forEach(function(e){
+      (local[f] || []).forEach(function(e, idx){
         if(!e) return;
-        if(!e.id) e.id = Math.random().toString(36).slice(2,8); // migration
+        if(!e.id) e.id = _legacyEntryId(e, idx);
         var existing = byId[e.id];
         if(!existing || (e._ts || 0) >= (existing._ts || 0)) byId[e.id] = e;
       });
@@ -1132,8 +1167,7 @@ const SheetsSync = {
         return String(v);
       }));
     });
-    await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + sheet + ':clear',
-      { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    // Write data first — if this fails, existing data is preserved
     const range = sheet + '!A1:' + this._col(schema.length) + rows.length;
     const r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
       { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ values: rows }) });
@@ -1142,6 +1176,13 @@ const SheetsSync = {
       try { const errBody = await r.json(); errMsg += ' — ' + (errBody.error && errBody.error.message || JSON.stringify(errBody.error || errBody)); } catch(e2) {}
       throw new Error(errMsg);
     }
+    // Clear trailing rows beyond the written range (stale data from previous larger writes)
+    var tailStart = rows.length + 1;
+    var tailRange = sheet + '!A' + tailStart + ':' + this._col(schema.length) + (tailStart + 500);
+    try {
+      await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + tailRange + ':clear',
+        { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    } catch(e) { /* non-fatal: stale trailing rows remain but no data loss */ }
   }
 };
 
@@ -1436,7 +1477,8 @@ function nowLocalDatetime(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
-function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
+let _toastTimer = null;
+function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); if(_toastTimer) clearTimeout(_toastTimer); _toastTimer = setTimeout(()=>{ el.classList.remove('show'); _toastTimer = null; },1900); }
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
@@ -1910,7 +1952,7 @@ function collectQuickMedEntry(){
 
 function getMedsRecord(date, create){
   const existing = Store.getByDate('meds', date);
-  if(existing) return { ...existing, entries: [...existing.entries] };
+  if(existing) return { ...existing, entries: [...(existing.entries || [])] };
   if(!create) return null;
   return {
     submission_id: nowStamp(),
@@ -2093,6 +2135,7 @@ function editFromLog(date, coll){
   else if(coll==='assess') loadAssess(date);
   else if(coll==='meds') loadMeds(date);
   switchSeg(coll);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   toast(`${t('toast_editing')} ${t('tab_'+coll)} · ${fmtDate(date)}`);
 }
 
