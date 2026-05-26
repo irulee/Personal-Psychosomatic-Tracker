@@ -635,6 +635,7 @@ const Store = {
       await SheetsSync.ensure();
       const d = this._all();
       let updated = false;
+      let anyError = false;
       for (const coll of ['daily','assess','meds']) {
         if (!d[coll].some(r => r._dirty)) continue;
         try {
@@ -670,16 +671,16 @@ const Store = {
           await SheetsSync.write(coll, merged);
           d[coll].forEach(r => { r._dirty = false; delete r._dirty_fields; });
           updated = true;
-          _syncError = false;
         } catch(e) {
           console.error('Sheets sync failed for ' + coll, e);
-          _syncError = true;
+          anyError = true;
           const detail = e && e.message ? ' (' + e.message + ')' : '';
           toast(t('toast_sync_error') + detail);
         } finally {
           if (typeof updateSyncUI === 'function') updateSyncUI();
         }
       }
+      _syncError = anyError;
       if (updated) this._commit(d);
       if (typeof updateSyncUI === 'function') updateSyncUI();
     } finally {
@@ -1930,7 +1931,9 @@ function clearMedQuickFields(){
   if(!med) return;
   med.fields.forEach(f=>{
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
-    if(el) el.value = '';
+    if(!el) return;
+    // Reset taken_at to current datetime so the next entry defaults to "now"
+    el.value = f === 'taken_at' ? nowLocalDatetime() : '';
   });
   $$('#med_quick_fields .tyn.on').forEach(b => b.classList.remove('on'));
 }
@@ -1982,8 +1985,6 @@ function logIntake(){
   }
   guardSubmitBtn($('#btn_log_intake'), ()=>{
     const rec = getMedsRecord(date, true);
-    const existing = Store.getByDate('meds', date);
-    if(existing) rec.submission_id = existing.submission_id;
     rec.entries.push(entry);
     persistMedsRecord(rec);
     clearMedQuickFields();
@@ -2353,7 +2354,7 @@ $('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
 $('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
 $('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
 
-window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud(); Store.syncQueue(); });
+window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud().then(()=> Store.syncQueue()); });
 window.addEventListener('offline', updateSyncUI);
 
 let _gisAttempts = 0;
