@@ -439,7 +439,9 @@ const Store = {
   },
   getByDate(coll, date){
     const d = this._all();
-    return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
+    const rec = d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
+    // Return a shallow clone to prevent callers from accidentally mutating the cache
+    return rec ? Object.assign({}, rec) : null;
   },
   list(coll){ return this._all()[coll]; },
   everything(){ return this._all(); },
@@ -668,6 +670,18 @@ const Store = {
           });
           const merged = Object.values(bySub).sort((a, b) =>
             String(a.submission_id).localeCompare(String(b.submission_id)));
+          // Garbage-collect tombstones older than 30 days — all devices have
+          // had ample time to observe the deletion by this point.
+          if (coll === 'meds') {
+            const gcCutoff = Date.now() - 30 * 86400000;
+            merged.forEach(function(rec) {
+              if (rec.entries && Array.isArray(rec.entries)) {
+                rec.entries = rec.entries.filter(function(e) {
+                  return !e._deleted || (e._ts || 0) > gcCutoff;
+                });
+              }
+            });
+          }
           await SheetsSync.write(coll, merged);
           d[coll].forEach(r => { r._dirty = false; delete r._dirty_fields; });
           updated = true;
