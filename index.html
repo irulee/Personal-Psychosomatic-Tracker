@@ -773,7 +773,7 @@ const GoogleAuth = {
     });
   },
 
-  _onToken(resp) {
+  async _onToken(resp) {
     if (resp.error) {
       this.token = null;
       if (this._refreshResolve) { this._refreshResolve(); this._refreshResolve = null; }
@@ -793,11 +793,12 @@ const GoogleAuth = {
       return;
     }
     _authExpired = false;
-    this._fetchEmail();
     if (this._refreshResolve) {
+      this._fetchEmail(); // fire-and-forget on silent refresh
       this._refreshResolve();
       this._refreshResolve = null;
     } else {
+      await this._fetchEmail(); // await on fresh sign-in so email is available for sheet title
       localStorage.setItem('monitor_auth_mode', 'google');
       updateAuthUI();
       updateSyncUI();
@@ -1018,15 +1019,53 @@ const SheetsSync = {
   },
 
   async _doEnsure() {
+    // 1. If we have a cached ID, verify it still exists
     if (this.id) {
       try {
-        const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId');
-        if (r.ok) return this.id;
-      } catch(e) {}
-      localStorage.removeItem('monitor_sheets_id');
+        const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId,properties/title');
+        if (r.ok) {
+          // Auto-rename old sheets to include user email for identification
+          try {
+            var rData = await r.json();
+            var curTitle = rData.properties && rData.properties.title || '';
+            var em = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+            if (em && curTitle && curTitle.indexOf(em) === -1) {
+              GoogleAuth.authFetch(this.BASE + '/' + this.id + ':batchUpdate', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requests: [{ updateSpreadsheetProperties: { properties: { title: 'PPT Monitor Data — ' + em }, fields: 'title' } }] })
+              }).then(function(rr){ if(!rr.ok) console.warn('Sheet rename failed', rr.status); }).catch(function(){});
+            }
+          } catch(e2) {}
+          return this.id;
+        }
+        // Only clear the ID on a definitive 404 (sheet truly gone).
+        // 403/network errors may be transient (Safari ITP re-consent, token race).
+        if (r.status === 404) localStorage.removeItem('monitor_sheets_id');
+        else return this.id; // keep cached ID, retry next sync
+      } catch(e) {
+        // Network error — don't nuke the ID; surface to caller
+        return this.id;
+      }
     }
+    // 2. No cached ID — search Drive for an existing PPT Monitor Data spreadsheet
+    var email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+    try {
+      var q = encodeURIComponent("name contains 'PPT Monitor Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      var search = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&orderBy=createdTime&pageSize=10');
+      if (search.ok) {
+        var sData = await search.json();
+        if (sData.files && sData.files.length) {
+          // Prefer sheet whose title contains this user's email, else take the oldest
+          var match = email ? sData.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
+          this.id = (match || sData.files[0]).id;
+          return this.id;
+        }
+      }
+    } catch(e) { console.warn('Drive search for existing sheet failed', e); }
+    // 3. Nothing found — create a new spreadsheet titled with user email
+    var sheetTitle = 'PPT Monitor Data' + (email ? ' — ' + email : '');
     const body = {
-      properties: { title: 'PPT Monitor Data' },
+      properties: { title: sheetTitle },
       sheets: ['daily','assess','meds'].map(function(name) {
         return {
           properties: { title: name },
