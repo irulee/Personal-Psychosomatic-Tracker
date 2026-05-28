@@ -707,15 +707,26 @@ const Store = {
     _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
       await SheetsSync.ensure();
+      console.warn('[PPT] Hydrating from sheet:', SheetsSync.id);
       const cloud = {};
       let cloudEmpty = true;
       for (const coll of ['daily','assess','meds']) {
         cloud[coll] = await SheetsSync.read(coll);
         if (cloud[coll].length > 0) cloudEmpty = false;
       }
+      console.warn('[PPT] Cloud records:', cloud.daily.length, 'daily,', cloud.assess.length, 'assess,', cloud.meds.length, 'meds');
 
       // First sync: cloud is empty, push local data up
       if (cloudEmpty) {
+        const localTotal = this._all().daily.length + this._all().assess.length + this._all().meds.length;
+        console.warn('[PPT] Cloud is empty — pushing local data up (local has', localTotal, 'records)');
+        if (localTotal === 0) {
+          // Signed in but no data anywhere — warn the user
+          console.warn('[PPT] ⚠ No data in cloud or local. Sheet ID:', SheetsSync.id);
+          toast(currentLang === 'zh'
+            ? '已連接試算表但未找到資料 — 點擊同步狀態查看詳情'
+            : 'Connected to sheet but no data found — tap sync status for details');
+        }
         await this._syncToSheets();
         if (typeof updateSyncUI === 'function') updateSyncUI();
         return;
@@ -954,10 +965,13 @@ function _restoreToken(){
       GoogleAuth.tokenExpiry = d.e;
       _authExpired = false;
       localStorage.setItem('monitor_auth_mode', 'google');
-      GoogleAuth._fetchEmail();
       updateAuthUI();
       updateSyncUI();
-      Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+      // Await email before hydration — email is needed for Drive sheet search
+      // when Safari ITP has cleared the cached sheet ID from localStorage
+      GoogleAuth._fetchEmail().then(function(){
+        Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+      });
       return true;
     }
     // Expired — signal caller to try silent refresh
@@ -1070,6 +1084,7 @@ const SheetsSync = {
 
   async _doEnsure() {
     // 1. If we have a cached ID, verify it still exists
+    console.warn('[PPT] _doEnsure: cached sheet ID =', this.id || '(none)', ', email =', GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '(none)');
     if (this.id) {
       try {
         const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId,properties/title');
@@ -1086,6 +1101,8 @@ const SheetsSync = {
               }).then(function(rr){ if(!rr.ok) console.warn('Sheet rename failed', rr.status); }).catch(function(){});
             }
           } catch(e2) {}
+          // Ensure appProperties tag exists (retroactive for sheets created before tagging was added)
+          this._tagSheet(this.id);
           return this.id;
         }
         // Only clear the ID on a definitive 404 (sheet truly gone).
@@ -1099,19 +1116,38 @@ const SheetsSync = {
     }
     // 2. No cached ID — search Drive for an existing PPT Monitor Data spreadsheet
     var email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+    // 2a. Primary search: by app-specific tag (most reliable — survives renames, app-specific)
     try {
-      var q = encodeURIComponent("name contains 'PPT Monitor Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
-      var search = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&orderBy=createdTime&pageSize=10');
-      if (search.ok) {
-        var sData = await search.json();
-        if (sData.files && sData.files.length) {
-          // Prefer sheet whose title contains this user's email, else take the oldest
-          var match = email ? sData.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
-          this.id = (match || sData.files[0]).id;
+      var q1 = encodeURIComponent("appProperties has { key='ppt_monitor' and value='v1' } and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      var search1 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q1 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=5');
+      if (search1.ok) {
+        var s1Data = await search1.json();
+        if (s1Data.files && s1Data.files.length) {
+          console.warn('[PPT] Found', s1Data.files.length, 'tagged sheet(s):', s1Data.files.map(function(f){ return f.name; }));
+          var match1 = email ? s1Data.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
+          this.id = (match1 || s1Data.files[0]).id;
+          console.warn('[PPT] Selected tagged sheet:', this.id);
           return this.id;
         }
       }
-    } catch(e) { console.warn('Drive search for existing sheet failed', e); }
+    } catch(e) { console.warn('[PPT] appProperties search failed (expected for older sheets)', e); }
+    // 2b. Fallback search: by filename (for sheets created before tagging was added)
+    try {
+      var q2 = encodeURIComponent("name contains 'PPT Monitor Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      var search2 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q2 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=10');
+      if (search2.ok) {
+        var s2Data = await search2.json();
+        if (s2Data.files && s2Data.files.length) {
+          console.warn('[PPT] Name search found', s2Data.files.length, 'sheet(s):', s2Data.files.map(function(f){ return f.name; }));
+          var match2 = email ? s2Data.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
+          this.id = (match2 || s2Data.files[0]).id;
+          console.warn('[PPT] Selected sheet by name:', (match2 ? 'email-matched' : 'most-recent'), '→', this.id);
+          // Retroactively tag this sheet for future searches
+          this._tagSheet(this.id);
+          return this.id;
+        }
+      }
+    } catch(e) { console.warn('[PPT] Drive name search failed', e); }
     // 3. Nothing found — create a new spreadsheet titled with user email
     var sheetTitle = 'PPT Monitor Data' + (email ? ' — ' + email : '');
     const body = {
@@ -1137,7 +1173,18 @@ const SheetsSync = {
     }
     const data = await r2.json();
     this.id = data.spreadsheetId;
+    // Tag with appProperties so we can reliably find this sheet later
+    // (survives renames, invisible to user, app-specific)
+    this._tagSheet(this.id);
     return this.id;
+  },
+
+  _tagSheet(fileId) {
+    GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appProperties: { ppt_monitor: 'v1' } })
+    }).catch(function(){});
   },
 
   async read(sheet) {
@@ -1204,6 +1251,7 @@ const SheetsSync = {
 function syncLabel(key, vars){
   const L = {
     synced: { en: '[ Synced ]', zh: '[ 已同步 ]' },
+    synced_empty: { en: '[ No data found ]', zh: '[ 未找到資料 ]' },
     syncing: { en: '[ Syncing: {n} pending ]', zh: '[ 同步中：{n} 待傳 ]' },
     offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' },
     local: { en: '[ Local only ]', zh: '[ 僅本機 ]' },
@@ -1237,8 +1285,15 @@ function updateSyncUI(){
     el.textContent = syncLabel('error');
     el.style.color = 'var(--neg)';
   } else if(n === 0){
-    el.textContent = syncLabel('synced');
-    el.style.color = 'var(--mid)';
+    const d = Store._all();
+    const total = d.daily.length + d.assess.length + d.meds.length;
+    if(total === 0 && isGoogle){
+      el.textContent = syncLabel('synced_empty');
+      el.style.color = 'var(--neg)';
+    } else {
+      el.textContent = syncLabel('synced');
+      el.style.color = 'var(--mid)';
+    }
   } else if(!navigator.onLine){
     el.textContent = syncLabel('offline', { n });
     el.style.color = 'var(--neg)';
@@ -2367,6 +2422,24 @@ $('#brandBtn').addEventListener('click', ()=>{
 $('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
 $('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
 $('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
+
+// Tap sync indicator → diagnostic info (helps debug Safari / multi-sheet issues)
+$('#syncIndicator').addEventListener('click', function(){
+  const d = Store._all();
+  const total = d.daily.length + d.assess.length + d.meds.length;
+  const sheetId = SheetsSync.id || 'none';
+  const email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '—';
+  const mode = GoogleAuth.isSignedIn ? 'Google' : Store.endpoint ? 'Endpoint' : 'Local';
+  const lines = [
+    'Sync: ' + mode,
+    'Sheet: ' + sheetId,
+    'Email: ' + email,
+    'Records: ' + d.daily.length + ' daily, ' + d.assess.length + ' assess, ' + d.meds.length + ' meds',
+    'Dirty: ' + Store.countDirty(),
+    (total === 0 && GoogleAuth.isSignedIn ? '\n⚠ No data loaded. If you have multiple PPT sheets in Google Drive, delete the empty duplicates and reload.' : '')
+  ];
+  alert(lines.join('\n'));
+});
 
 window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud().then(()=> Store.syncQueue()); });
 window.addEventListener('offline', updateSyncUI);
