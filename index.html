@@ -1114,40 +1114,66 @@ const SheetsSync = {
         return this.id;
       }
     }
-    // 2. No cached ID — search Drive for an existing PPT Monitor Data spreadsheet
+    // 2. No cached ID — search Drive, then verify each candidate has actual data
     var email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
-    // 2a. Primary search: by app-specific tag (most reliable — survives renames, app-specific)
+    var candidates = [];
+    // 2a. Primary search: by app-specific tag (most reliable)
     try {
       var q1 = encodeURIComponent("appProperties has { key='ppt_monitor' and value='v1' } and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
       var search1 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q1 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=5');
       if (search1.ok) {
         var s1Data = await search1.json();
-        if (s1Data.files && s1Data.files.length) {
-          console.warn('[PPT] Found', s1Data.files.length, 'tagged sheet(s):', s1Data.files.map(function(f){ return f.name; }));
-          var match1 = email ? s1Data.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
-          this.id = (match1 || s1Data.files[0]).id;
-          console.warn('[PPT] Selected tagged sheet:', this.id);
-          return this.id;
-        }
+        if (s1Data.files) s1Data.files.forEach(function(f){ candidates.push(f); });
       }
-    } catch(e) { console.warn('[PPT] appProperties search failed (expected for older sheets)', e); }
-    // 2b. Fallback search: by filename (for sheets created before tagging was added)
+    } catch(e) {}
+    // 2b. Fallback search: by filename (for sheets created before tagging)
     try {
       var q2 = encodeURIComponent("name contains 'PPT Monitor Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
       var search2 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q2 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=10');
       if (search2.ok) {
         var s2Data = await search2.json();
-        if (s2Data.files && s2Data.files.length) {
-          console.warn('[PPT] Name search found', s2Data.files.length, 'sheet(s):', s2Data.files.map(function(f){ return f.name; }));
-          var match2 = email ? s2Data.files.find(function(f){ return f.name.indexOf(email) !== -1; }) : null;
-          this.id = (match2 || s2Data.files[0]).id;
-          console.warn('[PPT] Selected sheet by name:', (match2 ? 'email-matched' : 'most-recent'), '→', this.id);
-          // Retroactively tag this sheet for future searches
-          this._tagSheet(this.id);
-          return this.id;
+        if (s2Data.files) {
+          var seen = {};
+          candidates.forEach(function(f){ seen[f.id] = true; });
+          s2Data.files.forEach(function(f){ if (!seen[f.id]) candidates.push(f); });
         }
       }
-    } catch(e) { console.warn('[PPT] Drive name search failed', e); }
+    } catch(e) {}
+    if (candidates.length) {
+      console.warn('[PPT] Drive search found', candidates.length, 'candidate(s):', candidates.map(function(f){ return f.name + ' (' + f.id.slice(0,8) + '…)'; }));
+      // Sort: email-matched sheets first, then by original order (modifiedTime desc)
+      if (email) {
+        candidates.sort(function(a, b) {
+          var aMatch = a.name.indexOf(email) !== -1 ? 0 : 1;
+          var bMatch = b.name.indexOf(email) !== -1 ? 0 : 1;
+          return aMatch - bMatch;
+        });
+      }
+      // Verify each candidate has actual data (not just headers) — pick the first one that does
+      for (var ci = 0; ci < candidates.length; ci++) {
+        try {
+          var testR = await GoogleAuth.authFetch(this.BASE + '/' + candidates[ci].id + '/values/daily!A1:A2');
+          if (testR.ok) {
+            var testData = await testR.json();
+            var rows = testData.values || [];
+            if (rows.length >= 2) {
+              // This sheet has data beyond the header row
+              console.warn('[PPT] ✓ Sheet has data:', candidates[ci].name, '→', candidates[ci].id);
+              this.id = candidates[ci].id;
+              this._tagSheet(this.id);
+              return this.id;
+            } else {
+              console.warn('[PPT] ✗ Sheet is empty:', candidates[ci].name, '→', candidates[ci].id);
+            }
+          }
+        } catch(e) { console.warn('[PPT] Could not verify sheet', candidates[ci].id, e); }
+      }
+      // None had data — use the first candidate (might be a genuine first-time user)
+      console.warn('[PPT] No sheets with data found — using first candidate:', candidates[0].name);
+      this.id = candidates[0].id;
+      this._tagSheet(this.id);
+      return this.id;
+    }
     // 3. Nothing found — create a new spreadsheet titled with user email
     var sheetTitle = 'PPT Monitor Data' + (email ? ' — ' + email : '');
     const body = {
