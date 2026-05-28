@@ -1071,7 +1071,42 @@ const SheetsSync = {
   BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
 
   get id() { return localStorage.getItem('monitor_sheets_id'); },
-  set id(v) { localStorage.setItem('monitor_sheets_id', v); },
+  set id(v) {
+    if (v) { localStorage.setItem('monitor_sheets_id', v); this._idbStore('monitor_sheets_id', v); }
+    else { localStorage.removeItem('monitor_sheets_id'); this._idbDelete('monitor_sheets_id'); }
+  },
+
+  _idbOpen() {
+    return new Promise(function(resolve, reject) {
+      try {
+        var req = indexedDB.open('ppt_meta', 1);
+        req.onupgradeneeded = function(e) { e.target.result.createObjectStore('kv'); };
+        req.onsuccess = function(e) { resolve(e.target.result); };
+        req.onerror = function() { reject(); };
+      } catch(e) { reject(); }
+    });
+  },
+  _idbStore(key, val) {
+    this._idbOpen().then(function(db) {
+      db.transaction('kv', 'readwrite').objectStore('kv').put(val, key);
+    }).catch(function(){});
+  },
+  _idbDelete(key) {
+    this._idbOpen().then(function(db) {
+      db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
+    }).catch(function(){});
+  },
+  _idbGet(key) {
+    return this._idbOpen().then(function(db) {
+      return new Promise(function(resolve) {
+        var req = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+        req.onsuccess = function() { resolve(req.result || null); };
+        req.onerror = function() { resolve(null); };
+      });
+    }).catch(function(){ return null; });
+  },
+
+  _bindSource: null,
 
   _col: function(n) { let s=''; while(n>0){ n--; s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26); } return s; },
 
@@ -1083,32 +1118,56 @@ const SheetsSync = {
   },
 
   async _doEnsure() {
-    // 1. If we have a cached ID, verify it still exists
+    // 0. Restore sheet ID from IndexedDB if localStorage was cleared (Safari ITP)
+    if (!this.id) {
+      try {
+        var idbId = await this._idbGet('monitor_sheets_id');
+        if (idbId) {
+          console.warn('[PPT] Restored sheet ID from IndexedDB:', idbId.slice(0, 8) + '…');
+          localStorage.setItem('monitor_sheets_id', idbId);
+          this._bindSource = 'idb-restore';
+        }
+      } catch(e) {}
+    }
+    // 1. If we have a cached ID, verify it still exists and is not trashed
     console.warn('[PPT] _doEnsure: cached sheet ID =', this.id || '(none)', ', email =', GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '(none)');
     if (this.id) {
       try {
         const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId,properties/title');
         if (r.ok) {
-          // Auto-rename old sheets to include user email for identification
+          // Check if sheet is trashed (Sheets API still serves trashed files by ID)
           try {
-            var rData = await r.json();
-            var curTitle = rData.properties && rData.properties.title || '';
-            var em = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
-            if (em && curTitle && curTitle.indexOf(em) === -1) {
-              GoogleAuth.authFetch(this.BASE + '/' + this.id + ':batchUpdate', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requests: [{ updateSpreadsheetProperties: { properties: { title: 'PPT Monitor Data — ' + em }, fields: 'title' } }] })
-              }).then(function(rr){ if(!rr.ok) console.warn('Sheet rename failed', rr.status); }).catch(function(){});
+            var driveCheck = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files/' + this.id + '?fields=trashed');
+            if (driveCheck.ok) {
+              var driveData = await driveCheck.json();
+              if (driveData.trashed) {
+                console.warn('[PPT] Cached sheet is trashed — clearing and searching Drive');
+                this.id = null;
+              }
             }
-          } catch(e2) {}
-          // Ensure appProperties tag exists (retroactive for sheets created before tagging was added)
-          this._tagSheet(this.id);
-          return this.id;
+          } catch(e3) {}
+          if (this.id) {
+            // Auto-rename old sheets to include user email for identification
+            try {
+              var rData = await r.json();
+              var curTitle = rData.properties && rData.properties.title || '';
+              var em = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+              if (em && curTitle && curTitle.indexOf(em) === -1) {
+                GoogleAuth.authFetch(this.BASE + '/' + this.id + ':batchUpdate', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ requests: [{ updateSpreadsheetProperties: { properties: { title: 'PPT Monitor Data — ' + em }, fields: 'title' } }] })
+                }).then(function(rr){ if(!rr.ok) console.warn('Sheet rename failed', rr.status); }).catch(function(){});
+              }
+            } catch(e2) {}
+            this._tagSheet(this.id);
+            if (!this._bindSource) this._bindSource = 'cache';
+            return this.id;
+          }
         }
         // Only clear the ID on a definitive 404 (sheet truly gone).
         // 403/network errors may be transient (Safari ITP re-consent, token race).
-        if (r.status === 404) localStorage.removeItem('monitor_sheets_id');
-        else return this.id; // keep cached ID, retry next sync
+        if (r.status === 404) this.id = null;
+        else if (this.id) return this.id; // keep cached ID, retry next sync
       } catch(e) {
         // Network error — don't nuke the ID; surface to caller
         return this.id;
@@ -1149,30 +1208,44 @@ const SheetsSync = {
           return aMatch - bMatch;
         });
       }
-      // Verify each candidate has actual data (not just headers) — pick the first one that does
+      // Verify each candidate: schema header must start with 'submission_id', pick richest
+      var bestCandidate = null;
+      var bestRows = 0;
+      var validEmpty = null;
       for (var ci = 0; ci < candidates.length; ci++) {
         try {
-          var testR = await GoogleAuth.authFetch(this.BASE + '/' + candidates[ci].id + '/values/daily!A1:A2');
+          var testR = await GoogleAuth.authFetch(this.BASE + '/' + candidates[ci].id + '/values/daily!A1:A200');
           if (testR.ok) {
             var testData = await testR.json();
             var rows = testData.values || [];
-            if (rows.length >= 2) {
-              // This sheet has data beyond the header row
-              console.warn('[PPT] ✓ Sheet has data:', candidates[ci].name, '→', candidates[ci].id);
-              this.id = candidates[ci].id;
-              this._tagSheet(this.id);
-              return this.id;
+            if (rows.length >= 1 && rows[0][0] === 'submission_id') {
+              var dataRows = rows.length - 1;
+              console.warn('[PPT] ✓ Sheet verified:', candidates[ci].name, '→', dataRows, 'data rows');
+              if (dataRows > bestRows) {
+                bestCandidate = candidates[ci];
+                bestRows = dataRows;
+              }
+              if (!validEmpty && dataRows === 0) validEmpty = candidates[ci];
             } else {
-              console.warn('[PPT] ✗ Sheet is empty:', candidates[ci].name, '→', candidates[ci].id);
+              console.warn('[PPT] ✗ Sheet has wrong schema:', candidates[ci].name, '→', candidates[ci].id);
             }
           }
         } catch(e) { console.warn('[PPT] Could not verify sheet', candidates[ci].id, e); }
       }
-      // None had data — use the first candidate (might be a genuine first-time user)
-      console.warn('[PPT] No sheets with data found — using first candidate:', candidates[0].name);
-      this.id = candidates[0].id;
-      this._tagSheet(this.id);
-      return this.id;
+      if (bestCandidate) {
+        this.id = bestCandidate.id;
+        this._tagSheet(this.id);
+        this._bindSource = 'discovery (' + candidates.length + ' candidates, ' + bestRows + ' rows)';
+        return this.id;
+      }
+      if (validEmpty) {
+        this.id = validEmpty.id;
+        this._tagSheet(this.id);
+        this._bindSource = 'discovery (empty, ' + candidates.length + ' candidates)';
+        return this.id;
+      }
+      // No valid PPT sheets among candidates — warn and fall through to create new
+      console.warn('[PPT] ⚠ Found', candidates.length, 'candidate(s) but none had valid PPT schema');
     }
     // 3. Nothing found — create a new spreadsheet titled with user email
     var sheetTitle = 'PPT Monitor Data' + (email ? ' — ' + email : '');
@@ -1199,9 +1272,8 @@ const SheetsSync = {
     }
     const data = await r2.json();
     this.id = data.spreadsheetId;
-    // Tag with appProperties so we can reliably find this sheet later
-    // (survives renames, invisible to user, app-specific)
     this._tagSheet(this.id);
+    this._bindSource = 'created';
     return this.id;
   },
 
@@ -2459,6 +2531,7 @@ $('#syncIndicator').addEventListener('click', function(){
   const lines = [
     'Sync: ' + mode,
     'Sheet: ' + sheetId,
+    'Bound via: ' + (SheetsSync._bindSource || '—'),
     'Email: ' + email,
     'Records: ' + d.daily.length + ' daily, ' + d.assess.length + ' assess, ' + d.meds.length + ' meds',
     'Dirty: ' + Store.countDirty(),
