@@ -1806,7 +1806,7 @@ function getZolonForNight(dailyDate){
 
   candidateDates.forEach(recDate => {
     const rec = Store.getByDate('meds', recDate);
-    if(!rec || !rec.entries) return;
+    if(!rec || !Array.isArray(rec.entries)) return;
     rec.entries.forEach(entry => {
       if(entry.medication !== 'zolon') return;
       const dt = resolveZolonDatetime(entry, recDate);
@@ -1906,10 +1906,19 @@ function updateValence(){
 }
 valSlider.addEventListener('input', updateValence);
 
+// Coerce a possibly-legacy value into an array. Cloud rows can hold array fields
+// (body_sensations, etc.) as a plain string when an old non-JSON value fails to parse;
+// without this, .map/.forEach/.filter throw and can blank an entire view.
+function _asArr(v){
+  if(Array.isArray(v)) return v;
+  if(typeof v === 'string' && v.trim()) return v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  return [];
+}
+
 function renderValenceLog(log){
   const el = $('#d_valence_log');
   if(!el) return;
-  if(!log || !log.length){ el.innerHTML = ''; return; }
+  if(!Array.isArray(log) || !log.length){ el.innerHTML = ''; return; }
   let html = '<div class="vl-head">' + t('mood_log_head') + '</div>';
   let any = false;
   log.forEach(function(entry){
@@ -1983,7 +1992,7 @@ function loadDaily(date){
   if(rec){
     valSlider.value = Math.round((rec.valence ?? 0) * 100);
     updateValence();
-    (rec.body_sensations || []).forEach(s=>{
+    _asArr(rec.body_sensations).forEach(s=>{
       const chip = $$(`#d_body .chip`).find(c=>c.dataset.val===s);
       if(chip){
         chip.classList.add('on');
@@ -2240,7 +2249,7 @@ function collectQuickMedEntry(){
 
 function getMedsRecord(date, create){
   const existing = Store.getByDate('meds', date);
-  if(existing) return { ...existing, entries: [...(existing.entries || [])] };
+  if(existing) return { ...existing, entries: Array.isArray(existing.entries) ? [...existing.entries] : [] };
   if(!create) return null;
   return {
     submission_id: nowStamp(),
@@ -2304,7 +2313,7 @@ function medLineDisplay(m){
   return parts.map(p=>esc(String(p))).join(' · ');
 }
 
-function _activeEntries(arr){ return (arr || []).filter(function(e){ return e && !e._deleted; }); }
+function _activeEntries(arr){ return (Array.isArray(arr) ? arr : []).filter(function(e){ return e && !e._deleted; }); }
 
 function renderMedLedger(){
   const host = $('#med_ledger');
@@ -2443,16 +2452,18 @@ function _renderDateHTML(date, e){
   let body='<dl>';
   if(e.daily){
     const d=e.daily;
-    if(d.valence_log && d.valence_log.length > 1){
-      const readings = d.valence_log
+    const vlog = Array.isArray(d.valence_log) ? d.valence_log : [];
+    if(vlog.length > 1){
+      const readings = vlog
         .filter(function(r){ return r && typeof r.v === 'number'; })
         .map(function(r){ return esc(r.at) + ' ' + esc(t(valWord(r.v*100))) + ' (' + r.v.toFixed(2) + ')'; }).join(' → ');
       if(readings) body+=`<dt>${t('log_mood')}</dt><dd>${readings}</dd>`;
     } else if(typeof d.valence === 'number'){
       body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
     }
-    if(d.body_sensations&&d.body_sensations.length){
-      const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
+    const bsens = _asArr(d.body_sensations);
+    if(bsens.length){
+      const bodyTxt = bsens.map(s=>esc(t(s))).join(', ')
         + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
         + (d.body_other ? ` · ${esc(d.body_other)}` : '');
       body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
@@ -2507,7 +2518,13 @@ function renderLog(){
   if(!dates.length){ list.innerHTML=`<div class="empty">${esc(t('log_empty'))}</div>`; return; }
   const visible = dates.slice(0, _logLimit);
   const remaining = dates.length - visible.length;
-  let html = visible.map(date => _renderDateHTML(date, byDate[date])).join('');
+  let html = visible.map(function(date){
+    try { return _renderDateHTML(date, byDate[date]); }
+    catch(err){
+      console.error('[PPT] log render failed for ' + date, err);
+      return '<details class="log-entry"><summary><span class="ld">' + fmtDate(date) + '</span><span class="lv">⚠</span></summary><div class="log-body" style="padding:12px;">' + (currentLang === 'zh' ? '此筆紀錄無法顯示。' : 'Could not render this entry.') + '</div></details>';
+    }
+  }).join('');
   if(remaining > 0){
     html += `<button type="button" id="logShowMore" class="btn-ghost" style="width:100%;margin-top:12px;padding:10px;font-size:12px;letter-spacing:0.05em;">${t('log_show_more', { n: remaining })}</button>`;
   }
