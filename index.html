@@ -150,7 +150,7 @@ input[type=range].valence::-moz-range-thumb {
 .log-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
 .log-body dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 12px; margin-top: 10px; }
 .log-body dt { color: var(--mid); }
-.log-body dd { color: var(--ink); }
+.log-body dd { color: var(--ink); min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .log-edit { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-log-edit {
   background: var(--field); border: 1px solid var(--line-strong); padding: 5px 10px;
@@ -1364,19 +1364,26 @@ const SheetsSync = {
 
   async read(sheet) {
     if (!this.id) return [];
-    const cols = this.SCHEMA[sheet].length;
-    const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(cols));
+    const schema = this.SCHEMA[sheet];
+    // Map by HEADER NAME, not column position. Older sheets store columns in a layout
+    // that predates later schema additions (e.g. valence_log inserted after valence);
+    // positional reads then shift every field after the insertion point by one. Reading
+    // by header name realigns those sheets and is identical for correctly-ordered ones.
+    const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(Math.max(schema.length, 26)));
     if (!r.ok) return [];
     const data = await r.json();
     const rows = data.values || [];
     if (rows.length < 2) return [];
-    const schema = this.SCHEMA[sheet];
+    const header = rows[0] || [];
+    const colIndex = {};
+    header.forEach(function(name, i) { if (colIndex[name] === undefined) colIndex[name] = i; });
     const jf = this.JSON_FIELDS[sheet] || [];
     const self = this;
     return rows.slice(1).map(function(row) {
       const obj = {};
-      schema.forEach(function(f, i) {
-        let v = i < row.length ? row[i] : '';
+      schema.forEach(function(f) {
+        const ci = colIndex[f];
+        let v = (ci !== undefined && ci < row.length) ? row[ci] : '';
         if (jf.indexOf(f) >= 0 && typeof v === 'string' && v) { try { v = JSON.parse(v); } catch(e){} }
         else if (self.BOOLEAN.indexOf(f) >= 0) { v = v === 'true'; }
         else if (self.NUMERIC.indexOf(f) >= 0) {
