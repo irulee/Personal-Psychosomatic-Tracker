@@ -169,6 +169,11 @@ input[type=range].valence::-moz-range-thumb {
 .tyn:hover { background: #ece9e1; }
 .tyn.on { background: var(--ink); color: var(--bg); font-weight: 700; }
 
+.valence-log { font-size: 11px; color: var(--ink-soft); margin-top: 10px; line-height: 1.6; }
+.valence-log:empty { display: none; }
+.valence-log .vl-head { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); margin-bottom: 4px; }
+.valence-log .vl-entry { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid var(--line); }
+.valence-log .vl-entry:last-child { border-bottom: none; }
 .zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
 .zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
 .zolon-caution { font-size: 10px; color: var(--mid); margin-top: 2px; letter-spacing: 0.01em; }
@@ -245,6 +250,7 @@ input[type=range].valence::-moz-range-thumb {
         <span data-i18n="val_neutral">neutral</span>
         <span data-i18n="val_very_pleasant">very pleasant</span>
       </div>
+      <div id="d_valence_log" class="valence-log"></div>
     </div>
   </div>
 
@@ -281,14 +287,14 @@ input[type=range].valence::-moz-range-thumb {
       <span class="lab" data-i18n="sleep_quality_label">Sleep Quality (optional)</span>
       <select id="d_sleep_quality">
         <option value="">—</option>
-        <option value="poor" data-i18n-opt="sq_poor">Poor</option>
-        <option value="fair" data-i18n-opt="sq_fair">Fair</option>
-        <option value="ok" data-i18n-opt="sq_ok">OK</option>
-        <option value="good" data-i18n-opt="sq_good">Good</option>
+        <option value="4" data-i18n-opt="sq_4">Good</option>
+        <option value="3" data-i18n-opt="sq_3">Fair</option>
+        <option value="2" data-i18n-opt="sq_2">Poor</option>
+        <option value="1" data-i18n-opt="sq_1">Awful</option>
       </select>
     </label>
     <div class="zolon-auto" id="d_sleep_zolon"></div>
-    <div class="zolon-caution" data-i18n="sleep_zolon_caution">Assumes doses before 4:00 AM belong to the previous night.</div>
+    <div class="zolon-caution" data-i18n="sleep_zolon_caution">Assumes doses before 6:00 AM belong to the previous night.</div>
   </div>
 
   <div class="block">
@@ -1012,7 +1018,7 @@ function _cyclePersistMode(){
 
 // ---- Field-level merge helpers ----
 const _MUTABLE_FIELDS = {
-  daily: ['backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
+  daily: ['backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
   assess: ['phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
   meds: ['backfilled','entries']
 };
@@ -1060,11 +1066,11 @@ function _fieldMerge(cloud, local){
 // ---- Sheets API Sync ----
 const SheetsSync = {
   SCHEMA: {
-    daily: ['submission_id','entry_date','backfilled','valence','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
+    daily: ['submission_id','entry_date','backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
     assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty','_field_ts'],
     meds: ['submission_id','entry_date','backfilled','entries','_field_ts']
   },
-  JSON_FIELDS: { daily:['body_sensations','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
+  JSON_FIELDS: { daily:['body_sensations','valence_log','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
   NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
   BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
   NULLABLE: ['sleep_wakes'],
@@ -1462,6 +1468,7 @@ const I18N = {
   daily_head:{en:'Daily Entry',zh:'每日紀錄'}, daily_sub:{en:'mood · body · biological fact · note',zh:'情緒 · 身體 · 生理事實 · 備註'},
   entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
   val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
+  mood_log_head:{en:'Earlier readings',zh:'先前記錄'}, mood_log_at:{en:'at',zh:'於'},
   body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
   other_describe:{en:'other — describe',zh:'其他 — 描述'}, tension_where:{en:'tension — where?',zh:'緊繃 — 哪裡？'},
   bio_fact:{en:'Biological fact',zh:'生理事實'}, bio_hint:{en:'ate / slept / pain / etc.',zh:'飲食 / 睡眠 / 疼痛等'},
@@ -1535,10 +1542,11 @@ const I18N = {
   sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep Onset (rough)',zh:'入睡時間（概估）'},
   sleep_wakes:{en:'Wake Count',zh:'醒來次數'}, sleep_wake_time:{en:'Wake Time',zh:'早晨醒來'},
   sleep_quality_label:{en:'Sleep Quality (optional)',zh:'品質（選填）'},
-  sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'OK',zh:'可以'}, sq_good:{en:'Good',zh:'好'},
+  sq_4:{en:'Good',zh:'好'}, sq_3:{en:'Fair',zh:'尚可'}, sq_2:{en:'Poor',zh:'差'}, sq_1:{en:'Awful',zh:'很差'},
+  sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'Fair',zh:'尚可'}, sq_good:{en:'Good',zh:'好'},
   sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
   sleep_zolon_none:{en:'—',zh:'—'},
-  sleep_zolon_caution:{en:'Assumes doses before 4:00 AM belong to the previous night.',zh:'假設凌晨 4:00 前的劑量屬於前一夜。'},
+  sleep_zolon_caution:{en:'Assumes doses before 6:00 AM belong to the previous night.',zh:'假設凌晨 6:00 前的劑量屬於前一夜。'},
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
   'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
@@ -1650,6 +1658,10 @@ function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add(
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+// Normalize legacy sleep quality strings to numeric values (good=4, fair=3, poor=2, awful=1)
+const _SQ_NORM = { 'good':'4', 'ok':'3', 'fair':'3', 'poor':'2' };
+function normSQ(v){ return _SQ_NORM[v] || v; }
+
 function extractTime(val) {
   if (!val) return '';
   if (/^\d{2}:\d{2}$/.test(val)) return val; 
@@ -1704,14 +1716,14 @@ function resolveZolonDatetime(entry, recordEntryDate){
 function getZolonForNight(dailyDate){
   if(!dailyDate) return null;
 
-  // Window: 18:00 on (D-1) through 04:00 on D (local time)
+  // Window: 18:00 on (D-1) through 06:00 on D (local time)
   const dObj = new Date(dailyDate + 'T12:00:00');
   const dMinus1 = new Date(dObj); dMinus1.setDate(dMinus1.getDate() - 1);
   const fmtD = s => `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
   
   // Using the safe parser to guarantee mathematical comparisons work across devices
   const windowStart = parseLocalDatetime(fmtD(dMinus1) + 'T18:00:00').getTime();
-  const windowEnd   = parseLocalDatetime(dailyDate + 'T04:00:00').getTime();
+  const windowEnd   = parseLocalDatetime(dailyDate + 'T06:00:00').getTime();
 
   // Candidate meds record dates: D-2, D-1, D
   const dMinus2 = new Date(dObj); dMinus2.setDate(dMinus2.getDate() - 2);
@@ -1820,6 +1832,20 @@ function updateValence(){
 }
 valSlider.addEventListener('input', updateValence);
 
+function renderValenceLog(log){
+  const el = $('#d_valence_log');
+  if(!el) return;
+  if(!log || !log.length){ el.innerHTML = ''; return; }
+  let html = '<div class="vl-head">' + t('mood_log_head') + '</div>';
+  log.forEach(function(entry){
+    const v = entry.v;
+    const pct = (v * 100);
+    const word = t(valWord(pct));
+    html += '<div class="vl-entry"><span>' + esc(entry.at) + '</span><span style="color:' + valColor(pct) + '">' + word + ' (' + v.toFixed(2) + ')</span></div>';
+  });
+  el.innerHTML = html;
+}
+
 const bodyWrap = $('#d_body');
 BODY_SENSATIONS.forEach(s=>{
   const c=document.createElement('div'); c.className='chip'; c.textContent=t(s); c.dataset.val=s;
@@ -1864,6 +1890,7 @@ function clearDailyForm(){
   $('#d_sleep_wakes').value=''; $('#d_sleep_wake').value='';
   $('#d_sleep_quality').value='';
   $('#d_bio').value=''; $('#d_note').value='';
+  renderValenceLog(null);
 }
 function loadDaily(date){
   if(!date) return;
@@ -1887,9 +1914,10 @@ function loadDaily(date){
     if(rec.sleep_onset) $('#d_sleep_onset').value = extractTime(rec.sleep_onset);
     if(rec.sleep_wakes !== null && rec.sleep_wakes !== undefined) $('#d_sleep_wakes').value = rec.sleep_wakes;
     if(rec.sleep_wake_time) $('#d_sleep_wake').value = extractTime(rec.sleep_wake_time);
-    if(rec.sleep_quality) $('#d_sleep_quality').value = rec.sleep_quality;
+    if(rec.sleep_quality) $('#d_sleep_quality').value = normSQ(rec.sleep_quality);
     $('#d_bio').value = rec.biological_fact || '';
     $('#d_note').value = rec.note || '';
+    renderValenceLog(rec.valence_log);
   }
   updateDailySub();
   updateZolonDisplay();
@@ -1900,9 +1928,15 @@ function saveDaily(){
     const existing = Store.getByDate('daily', $('#d_date').value);
     const rec = collectDaily();
     if(existing) rec.submission_id = existing.submission_id;
+    // Append current reading to valence_log
+    const prevLog = (existing && existing.valence_log) || [];
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    rec.valence_log = prevLog.concat([{ v: rec.valence, at: timeStr }]);
     Store.put('daily', rec);
     toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
     updateDailySub();
+    renderValenceLog(rec.valence_log);
   });
 }
 function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); updateZolonDisplay(); }
@@ -2321,7 +2355,12 @@ function _renderDateHTML(date, e){
   let body='<dl>';
   if(e.daily){
     const d=e.daily;
-    body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
+    if(d.valence_log && d.valence_log.length > 1){
+      const readings = d.valence_log.map(function(r){ return esc(r.at) + ' ' + esc(t(valWord(r.v*100))) + ' (' + r.v.toFixed(2) + ')'; }).join(' → ');
+      body+=`<dt>${t('log_mood')}</dt><dd>${readings}</dd>`;
+    } else {
+      body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
+    }
     if(d.body_sensations&&d.body_sensations.length){
       const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
         + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
@@ -2334,7 +2373,7 @@ function _renderDateHTML(date, e){
       if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
       if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
       if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
-      if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
+      if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+normSQ(d.sleep_quality)))}`;
       body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
     }
     if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
@@ -2417,6 +2456,7 @@ function _validateRecord(coll, r) {
   if (r._field_ts !== undefined && (typeof r._field_ts !== 'object' || Array.isArray(r._field_ts))) return false;
   if (coll === 'daily') {
     if (r.valence !== undefined && typeof r.valence !== 'number') return false;
+    if (r.valence_log !== undefined && !Array.isArray(r.valence_log)) return false;
     if (r.body_sensations !== undefined && !Array.isArray(r.body_sensations)) return false;
   } else if (coll === 'assess') {
     if (r.phq9_items !== undefined && !Array.isArray(r.phq9_items)) return false;
