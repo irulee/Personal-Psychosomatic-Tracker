@@ -84,6 +84,10 @@ input[type=range].valence::-moz-range-thumb {
   width: 16px; height: 30px; background: var(--field); border: 1.5px solid var(--line-strong); border-radius: 0; cursor: pointer;
 }
 .valence-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.03em; }
+.valence-time { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-soft); margin-top: 10px; letter-spacing: 0.03em; }
+.valence-time .vt-now { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.valence-time .vt-refresh { background: var(--field); border: 1px solid var(--line-strong); cursor: pointer; font-family: var(--mono); font-size: 12px; line-height: 1; padding: 2px 7px; color: var(--ink-soft); border-radius: 0; }
+.valence-time .vt-refresh:hover { background: var(--ink); color: var(--bg); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
@@ -249,6 +253,11 @@ input[type=range].valence::-moz-range-thumb {
         <span data-i18n="val_very_unpleasant">very unpleasant</span>
         <span data-i18n="val_neutral">neutral</span>
         <span data-i18n="val_very_pleasant">very pleasant</span>
+      </div>
+      <div class="valence-time">
+        <span data-i18n="will_log_at">records at</span>
+        <span id="d_valence_time" class="vt-now">—</span>
+        <button type="button" id="btn_valence_time_refresh" class="vt-refresh" onclick="refreshValenceTime()" data-i18n-title="refresh_time" title="Refresh to current time">↻</button>
       </div>
       <div id="d_valence_log" class="valence-log"></div>
     </div>
@@ -556,7 +565,7 @@ const Store = {
       }
     }
 
-    if (updated) this._commit(d);
+    if (updated) { this._commit(d); _lastSyncTs = Date.now(); }
     if (typeof updateSyncUI === 'function') updateSyncUI();
   },
 
@@ -573,6 +582,7 @@ const Store = {
   },
 
   async hydrateFromCloud() {
+    if (_hydrating) return; // re-entrancy guard: avoid overlapping read-merge-commit cycles
     if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._hydrateFromSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
@@ -583,11 +593,10 @@ const Store = {
       const data = JSON.parse(textResult);
       if (data.daily === undefined && data.assess === undefined && data.meds === undefined) return;
 
-      const JSON_FIELDS = {
-        daily: ['body_sensations'],
-        assess: ['phq9_items', 'gad7_items'],
-        meds: ['entries']
-      };
+      // Single source of truth. (Was a stale local literal that omitted valence_log and
+      // _field_ts, so on the endpoint path those came back as unparsed JSON strings —
+      // valence_log-as-string then crashed renderValenceLog.)
+      const JSON_FIELDS = SheetsSync.JSON_FIELDS;
       const clean = (coll, rows) => (rows || []).map(r => {
         (JSON_FIELDS[coll] || []).forEach(f => {
           if (typeof r[f] === 'string') {
@@ -616,6 +625,7 @@ const Store = {
           String(a.submission_id).localeCompare(String(b.submission_id)));
       });
 
+      _lastHydrateTs = Date.now(); _lastHydrateSource = 'endpoint';
       const before = JSON.stringify(this._all());
       const after = JSON.stringify(merged);
       if (before !== after) {
@@ -701,7 +711,7 @@ const Store = {
         }
       }
       _syncError = anyError;
-      if (updated) this._commit(d);
+      if (updated) { this._commit(d); _lastSyncTs = Date.now(); }
       if (typeof updateSyncUI === 'function') updateSyncUI();
     } finally {
       _releaseSyncLock();
@@ -709,6 +719,7 @@ const Store = {
   },
 
   async _hydrateFromSheets() {
+    if (_hydrating) return; // re-entrancy guard (also reachable directly via hydrateFromCloud delegation)
     if (!navigator.onLine) return;
     _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
@@ -761,6 +772,7 @@ const Store = {
         merged[coll] = Object.values(bySub).sort((a, b) =>
           String(a.submission_id).localeCompare(String(b.submission_id)));
       });
+      _lastHydrateTs = Date.now(); _lastHydrateSource = 'sheets (' + (SheetsSync._bindSource || '?') + ')';
       const before = JSON.stringify(this._all());
       const after = JSON.stringify(merged);
       if (before !== after) {
@@ -789,6 +801,9 @@ const Store = {
 let _syncError = false;
 let _hydrating = false;
 let _authExpired = false;
+let _lastSyncTs = 0;          // timestamp of last successful push to cloud
+let _lastHydrateTs = 0;       // timestamp of last successful pull from cloud
+let _lastHydrateSource = null;// which backend/path produced the last pull
 const _TAB_ID = Math.random().toString(36).slice(2);
 const _SYNC_LOCK_KEY = 'monitor_sync_lock';
 const _SYNC_LOCK_TTL = 30000;
@@ -1016,12 +1031,72 @@ function _cyclePersistMode(){
   _updatePersistBtn();
 }
 
-// ---- Field-level merge helpers ----
-const _MUTABLE_FIELDS = {
-  daily: ['backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
-  assess: ['phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
-  meds: ['backfilled','entries']
+// ---- Data model: single source of truth ----
+// Each collection's fields, in the EXACT column order the cloud sheet uses.
+// type: omitted=text | 'num' | 'bool' | 'json'.  meta=true → identity/bookkeeping column
+// (not user-editable; excluded from _MUTABLE_FIELDS).  nullable=true → empty reads back as null.
+// SheetsSync.SCHEMA / JSON_FIELDS / NUMERIC / BOOLEAN / NULLABLE and _MUTABLE_FIELDS are all
+// DERIVED from this — add or change a field in ONE place. (Guarded by ?selftest.)
+const FIELDS = {
+  daily: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'backfilled', type:'bool' },
+    { k:'valence', type:'num' },
+    { k:'valence_log', type:'json' },
+    { k:'body_sensations', type:'json' },
+    { k:'body_tension_where' },
+    { k:'body_other' },
+    { k:'sleep_bedtime' },
+    { k:'sleep_onset' },
+    { k:'sleep_wakes', type:'num', nullable:true },
+    { k:'sleep_wake_time' },
+    { k:'sleep_quality' },
+    { k:'biological_fact' },
+    { k:'note' },
+    { k:'_field_ts', type:'json', meta:true }
+  ],
+  assess: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'phq9_items', type:'json' },
+    { k:'phq9_total', type:'num' },
+    { k:'phq9_complete', type:'bool' },
+    { k:'gad7_items', type:'json' },
+    { k:'gad7_total', type:'num' },
+    { k:'gad7_complete', type:'bool' },
+    { k:'functional_difficulty' },
+    { k:'_field_ts', type:'json', meta:true }
+  ],
+  meds: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'backfilled', type:'bool' },
+    { k:'entries', type:'json' },
+    { k:'_field_ts', type:'json', meta:true }
+  ]
 };
+
+function _deriveSchema(){
+  const colls = ['daily','assess','meds'];
+  const SCHEMA = {}, JSON_FIELDS = {}, MUTABLE = {};
+  const NUMERIC = [], BOOLEAN = [], NULLABLE = [];
+  colls.forEach(function(c){
+    SCHEMA[c] = FIELDS[c].map(function(f){ return f.k; });
+    JSON_FIELDS[c] = FIELDS[c].filter(function(f){ return f.type === 'json'; }).map(function(f){ return f.k; });
+    MUTABLE[c] = FIELDS[c].filter(function(f){ return !f.meta; }).map(function(f){ return f.k; });
+    FIELDS[c].forEach(function(f){
+      if(f.type === 'num'  && NUMERIC.indexOf(f.k) < 0) NUMERIC.push(f.k);
+      if(f.type === 'bool' && BOOLEAN.indexOf(f.k) < 0) BOOLEAN.push(f.k);
+      if(f.nullable        && NULLABLE.indexOf(f.k) < 0) NULLABLE.push(f.k);
+    });
+  });
+  return { SCHEMA:SCHEMA, JSON_FIELDS:JSON_FIELDS, NUMERIC:NUMERIC, BOOLEAN:BOOLEAN, NULLABLE:NULLABLE, MUTABLE:MUTABLE };
+}
+const _DERIVED = _deriveSchema();
+
+// ---- Field-level merge helpers ----
+const _MUTABLE_FIELDS = _DERIVED.MUTABLE;
 
 // Deterministic ID for legacy entries lacking one — same content → same ID
 function _legacyEntryId(e, idx){
@@ -1065,15 +1140,11 @@ function _fieldMerge(cloud, local){
 
 // ---- Sheets API Sync ----
 const SheetsSync = {
-  SCHEMA: {
-    daily: ['submission_id','entry_date','backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
-    assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty','_field_ts'],
-    meds: ['submission_id','entry_date','backfilled','entries','_field_ts']
-  },
-  JSON_FIELDS: { daily:['body_sensations','valence_log','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
-  NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
-  BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
-  NULLABLE: ['sleep_wakes'],
+  SCHEMA: _DERIVED.SCHEMA,
+  JSON_FIELDS: _DERIVED.JSON_FIELDS,
+  NUMERIC: _DERIVED.NUMERIC,
+  BOOLEAN: _DERIVED.BOOLEAN,
+  NULLABLE: _DERIVED.NULLABLE,
   BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
 
   get id() { return localStorage.getItem('monitor_sheets_id'); },
@@ -1088,8 +1159,9 @@ const SheetsSync = {
         var req = indexedDB.open('ppt_meta', 1);
         req.onupgradeneeded = function(e) { e.target.result.createObjectStore('kv'); };
         req.onsuccess = function(e) { resolve(e.target.result); };
-        req.onerror = function() { reject(); };
-      } catch(e) { reject(); }
+        req.onerror = function() { console.warn('[PPT] IndexedDB open failed — sheet-ID backup disabled, using localStorage only'); reject(); };
+        req.onblocked = function() { console.warn('[PPT] IndexedDB open blocked — another tab holds an older DB version open'); };
+      } catch(e) { console.warn('[PPT] IndexedDB unavailable:', e && e.message); reject(); }
     });
   },
   _idbStore(key, val) {
@@ -1288,7 +1360,8 @@ const SheetsSync = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ appProperties: { ppt_monitor: 'v1' } })
-    }).catch(function(){});
+    }).then(function(r){ if(r && !r.ok) console.warn('[PPT] Sheet tagging failed (' + r.status + ') — future discovery may fall back to filename match'); })
+      .catch(function(e){ console.warn('[PPT] Sheet tagging request errored — future discovery may fall back to filename match', e && e.message); });
   },
 
   async read(sheet) {
@@ -1407,7 +1480,7 @@ function updateSyncUI(){
   }
   // Append sync pathway suffix
   if(hasBackend && !_authExpired){
-    const via = isGoogle ? (currentLang === 'zh' ? ' · Google' : ' · Google') : (currentLang === 'zh' ? ' · 端點' : ' · Endpoint');
+    const via = isGoogle ? ' · Google' : (currentLang === 'zh' ? ' · 端點' : ' · Endpoint');
     el.textContent = el.textContent.replace(/\s*\]$/, via + ' ]');
   }
 }
@@ -1457,8 +1530,8 @@ function updateAuthUI(){
 function guardSubmitBtn(btn, fn){
   if(!btn || btn.disabled) return;
   btn.disabled = true;
-  fn();
-  setTimeout(()=>{ btn.disabled = false; }, 500);
+  try { fn(); }
+  finally { setTimeout(()=>{ btn.disabled = false; }, 500); }
 }
 
 let currentLang = 'en';
@@ -1469,6 +1542,7 @@ const I18N = {
   entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
   val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
   mood_log_head:{en:'Earlier readings',zh:'先前記錄'}, mood_log_at:{en:'at',zh:'於'},
+  will_log_at:{en:'records at',zh:'記錄於'}, refresh_time:{en:'Refresh to current time',zh:'更新為目前時間'},
   body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
   other_describe:{en:'other — describe',zh:'其他 — 描述'}, tension_where:{en:'tension — where?',zh:'緊繃 — 哪裡？'},
   bio_fact:{en:'Biological fact',zh:'生理事實'}, bio_hint:{en:'ate / slept / pain / etc.',zh:'飲食 / 睡眠 / 疼痛等'},
@@ -1742,7 +1816,7 @@ function getZolonForNight(dailyDate){
       
       const ts = dt.getTime();
       
-      // If the parsed date safely sits within the 18:00 -> 04:00 window, surface it.
+      // If the parsed date safely sits within the 18:00 -> 06:00 window, surface it.
       if(ts >= windowStart && ts < windowEnd && ts > bestTime){
         best = { entry, datetime: dt };
         bestTime = ts;
@@ -1780,6 +1854,7 @@ function renderI18n(){
   $$('[data-i18n-placeholder]').forEach(el=>{
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
+  $$('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
   $$('option[data-i18n-opt]').forEach(opt=>{ opt.textContent = t(opt.dataset.i18nOpt); });
   $$('#d_body .chip').forEach(c=>{ c.textContent = t(c.dataset.val); });
   rebuildAssessItems();
@@ -1807,6 +1882,7 @@ function switchSeg(seg){
   $$('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.seg===seg));
   $$('.seg').forEach(x=>x.classList.remove('active'));
   $('#seg-'+seg).classList.add('active');
+  if(seg==='daily') refreshValenceTime();
   if(seg==='log'){ _logLimit = _LOG_PAGE; renderLog(); }
   if(seg==='assess') refreshDueBanner();
   if(seg==='meds') renderMedLedger();
@@ -1837,14 +1913,22 @@ function renderValenceLog(log){
   if(!el) return;
   if(!log || !log.length){ el.innerHTML = ''; return; }
   let html = '<div class="vl-head">' + t('mood_log_head') + '</div>';
+  let any = false;
   log.forEach(function(entry){
+    if(!entry || typeof entry.v !== 'number') return;
     const v = entry.v;
     const pct = (v * 100);
     const word = t(valWord(pct));
     html += '<div class="vl-entry"><span>' + esc(entry.at) + '</span><span style="color:' + valColor(pct) + '">' + word + ' (' + v.toFixed(2) + ')</span></div>';
+    any = true;
   });
-  el.innerHTML = html;
+  el.innerHTML = any ? html : '';
 }
+
+// Time that the next valence reading will be stamped with. Manually refreshable
+// (a snapshot rather than a live clock) — saveDaily records exactly this value.
+function currentLogTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function refreshValenceTime(){ const el=$('#d_valence_time'); if(el) el.textContent = currentLogTime(); }
 
 const bodyWrap = $('#d_body');
 BODY_SENSATIONS.forEach(s=>{
@@ -1891,6 +1975,7 @@ function clearDailyForm(){
   $('#d_sleep_quality').value='';
   $('#d_bio').value=''; $('#d_note').value='';
   renderValenceLog(null);
+  refreshValenceTime();
 }
 function loadDaily(date){
   if(!date) return;
@@ -1930,13 +2015,14 @@ function saveDaily(){
     if(existing) rec.submission_id = existing.submission_id;
     // Append current reading to valence_log
     const prevLog = (existing && existing.valence_log) || [];
-    const now = new Date();
-    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    const timeEl = $('#d_valence_time');
+    const timeStr = (timeEl && /^\d{2}:\d{2}$/.test(timeEl.textContent)) ? timeEl.textContent : currentLogTime();
     rec.valence_log = prevLog.concat([{ v: rec.valence, at: timeStr }]);
     Store.put('daily', rec);
     toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
     updateDailySub();
     renderValenceLog(rec.valence_log);
+    refreshValenceTime();
   });
 }
 function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); updateZolonDisplay(); }
@@ -2234,7 +2320,7 @@ function renderMedLedger(){
   host.innerHTML = active.map(function(e){
     return `<div class="med-ledger-item">
       <span>${medLineDisplay(e)}</span>
-      <button type="button" class="btn-rm-ledger" onclick="removeMedEntry('${e.id}')" aria-label="remove">×</button>
+      <button type="button" class="btn-rm-ledger" data-rm-entry="${esc(String(e.id)).replace(/"/g,'&quot;')}" aria-label="remove">×</button>
     </div>`;
   }).join('');
 }
@@ -2256,6 +2342,10 @@ function loadMeds(date){
 
 $('#med_selector').addEventListener('change', renderMedQuickFields);
 $('#m_date').addEventListener('change', ()=>loadMeds($('#m_date').value));
+$('#med_ledger').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-rm-entry]');
+  if(btn) removeMedEntry(btn.getAttribute('data-rm-entry'));
+});
 initMedSelector();
 
 // ---- Template editor ----
@@ -2348,7 +2438,7 @@ function _renderDateHTML(date, e){
   const medEntries = e.meds ? _activeEntries(e.meds.entries) : [];
   const tags=[];
   if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
-  if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
+  if(e.assess) tags.push(`PHQ ${e.assess.phq9_total ?? 0} · GAD ${e.assess.gad7_total ?? 0}`);
   if(medEntries.length)
     tags.push(`${medEntries.length} ${t('log_med_entries')}`);
   const valTag = tags.join(' · ') || '—';
@@ -2356,9 +2446,11 @@ function _renderDateHTML(date, e){
   if(e.daily){
     const d=e.daily;
     if(d.valence_log && d.valence_log.length > 1){
-      const readings = d.valence_log.map(function(r){ return esc(r.at) + ' ' + esc(t(valWord(r.v*100))) + ' (' + r.v.toFixed(2) + ')'; }).join(' → ');
-      body+=`<dt>${t('log_mood')}</dt><dd>${readings}</dd>`;
-    } else {
+      const readings = d.valence_log
+        .filter(function(r){ return r && typeof r.v === 'number'; })
+        .map(function(r){ return esc(r.at) + ' ' + esc(t(valWord(r.v*100))) + ' (' + r.v.toFixed(2) + ')'; }).join(' → ');
+      if(readings) body+=`<dt>${t('log_mood')}</dt><dd>${readings}</dd>`;
+    } else if(typeof d.valence === 'number'){
       body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
     }
     if(d.body_sensations&&d.body_sensations.length){
@@ -2382,8 +2474,10 @@ function _renderDateHTML(date, e){
   if(e.assess){
     const a=e.assess;
     const inc = ' · ' + t('log_incomplete');
-    body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${esc(t(phqSeverity(a.phq9_total)))})${a.phq9_complete?'':inc}</dd>`;
-    body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
+    const pt = typeof a.phq9_total === 'number' ? a.phq9_total : 0;
+    const gt = typeof a.gad7_total === 'number' ? a.gad7_total : 0;
+    body+=`<dt>PHQ-9</dt><dd>${pt} (${esc(t(phqSeverity(pt)))})${a.phq9_complete?'':inc}</dd>`;
+    body+=`<dt>GAD-7</dt><dd>${gt} (${esc(t(gadSeverity(gt)))})${a.gad7_complete?'':inc}</dd>`;
     if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
   }
   if(medEntries.length){
@@ -2562,23 +2656,45 @@ $('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
 $('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
 
 // Tap sync indicator → diagnostic info (helps debug Safari / multi-sheet issues)
-$('#syncIndicator').addEventListener('click', function(){
+function _agoStr(ts){
+  if(!ts) return '—';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if(s < 60) return s + 's ago';
+  if(s < 3600) return Math.round(s / 60) + 'm ago';
+  return Math.round(s / 3600) + 'h ago';
+}
+function _syncDiagnostics(){
   const d = Store._all();
   const total = d.daily.length + d.assess.length + d.meds.length;
-  const sheetId = SheetsSync.id || 'none';
-  const email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '—';
-  const mode = GoogleAuth.isSignedIn ? 'Google' : Store.endpoint ? 'Endpoint' : 'Local';
+  const isGoogle = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const mode = isGoogle ? 'Google' : Store.endpoint ? 'Endpoint' : 'Local';
+  let token = '—';
+  if(isGoogle && GoogleAuth.tokenExpiry){
+    const m = Math.round((GoogleAuth.tokenExpiry - Date.now()) / 60000);
+    token = m > 0 ? ('valid ~' + m + 'm') : 'expired';
+  }
+  const flags = [];
+  if(_syncError) flags.push('syncError');
+  if(_authExpired) flags.push('authExpired');
+  if(_hydrating) flags.push('hydrating');
   const lines = [
     'Sync: ' + mode,
-    'Sheet: ' + sheetId,
+    'Online: ' + (navigator.onLine ? 'yes' : 'no'),
+    'Sheet: ' + (SheetsSync.id || 'none'),
     'Bound via: ' + (SheetsSync._bindSource || '—'),
-    'Email: ' + email,
+    'Email: ' + (GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '—'),
+    'Persist: ' + (typeof _getPersistMode === 'function' ? _getPersistMode() : '—'),
+    'Token: ' + token,
     'Records: ' + d.daily.length + ' daily, ' + d.assess.length + ' assess, ' + d.meds.length + ' meds',
     'Dirty: ' + Store.countDirty(),
-    (total === 0 && GoogleAuth.isSignedIn ? '\n⚠ No data loaded. If you have multiple PPT sheets in Google Drive, delete the empty duplicates and reload.' : '')
+    'Last sync: ' + _agoStr(_lastSyncTs),
+    'Last hydrate: ' + _agoStr(_lastHydrateTs) + (_lastHydrateSource ? ' via ' + _lastHydrateSource : ''),
+    'Flags: ' + (flags.length ? flags.join(', ') : 'none'),
+    (total === 0 && isGoogle ? '\n⚠ No data loaded. If you have multiple PPT sheets in Google Drive, delete the empty duplicates and reload.' : '')
   ];
-  alert(lines.join('\n'));
-});
+  return lines.join('\n');
+}
+$('#syncIndicator').addEventListener('click', function(){ alert(_syncDiagnostics()); });
 
 window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud().then(()=> Store.syncQueue()); });
 window.addEventListener('offline', updateSyncUI);
@@ -2604,7 +2720,120 @@ function _waitForGIS(){
   }
 }
 
+// ---- Dev self-test (run by adding ?selftest to the URL) ----
+// Asserts the data-model invariants the sync layer depends on, against an INDEPENDENT
+// golden copy. This is the gate for deriving the schema from a single source of truth:
+// if the derived values ever drift from this contract, or a record fails to round-trip
+// through (de)serialization, this fails loudly. Not part of normal app operation.
+function _runSelfTest(){
+  const GOLD = {
+    SCHEMA: {
+      daily: ['submission_id','entry_date','backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
+      assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty','_field_ts'],
+      meds: ['submission_id','entry_date','backfilled','entries','_field_ts']
+    },
+    JSON_FIELDS: { daily:['body_sensations','valence_log','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
+    NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
+    BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
+    NULLABLE: ['sleep_wakes'],
+    MUTABLE: {
+      daily: ['backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
+      assess: ['phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
+      meds: ['backfilled','entries']
+    }
+  };
+  const results = [];
+  const eq = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  function sortDeep(x){
+    if(Array.isArray(x)) return x.slice().sort();
+    if(x && typeof x === 'object'){ const o={}; Object.keys(x).sort().forEach(function(k){ o[k]=sortDeep(x[k]); }); return o; }
+    return x;
+  }
+  function check(name, actual, expected){
+    const pass = eq(actual, expected);
+    results.push(pass ? { name, pass } : { name, pass, actual, expected });
+  }
+  // order-insensitive: these metadata lists are membership/iteration lookups, not positional
+  function checkSet(name, actual, expected){
+    const pass = eq(sortDeep(actual), sortDeep(expected));
+    results.push(pass ? { name, pass } : { name, pass, actual, expected });
+  }
+
+  // 1. Live schema metadata matches the golden contract.
+  //    SCHEMA is POSITIONAL (maps to cloud sheet columns) → order-strict.
+  //    The rest are used via .indexOf()/.forEach() → order-insensitive (set equality).
+  check('SCHEMA', SheetsSync.SCHEMA, GOLD.SCHEMA);
+  checkSet('JSON_FIELDS', SheetsSync.JSON_FIELDS, GOLD.JSON_FIELDS);
+  checkSet('NUMERIC', SheetsSync.NUMERIC, GOLD.NUMERIC);
+  checkSet('BOOLEAN', SheetsSync.BOOLEAN, GOLD.BOOLEAN);
+  checkSet('NULLABLE', SheetsSync.NULLABLE, GOLD.NULLABLE);
+  checkSet('_MUTABLE_FIELDS', _MUTABLE_FIELDS, GOLD.MUTABLE);
+
+  // 2. Structural self-consistency: _MUTABLE_FIELDS == SCHEMA minus the meta columns,
+  //    and every JSON field is present in SCHEMA.
+  const META = ['submission_id','entry_date','_field_ts'];
+  ['daily','assess','meds'].forEach(function(c){
+    const schema = SheetsSync.SCHEMA[c];
+    check('MUTABLE==SCHEMA-meta ['+c+']', _MUTABLE_FIELDS[c], schema.filter(function(k){ return META.indexOf(k) < 0; }));
+    (SheetsSync.JSON_FIELDS[c]||[]).forEach(function(f){
+      check('JSON in SCHEMA ['+c+'.'+f+']', schema.indexOf(f) >= 0, true);
+    });
+  });
+
+  // 3. Serialization round-trip (mirrors read()/write() using the LIVE metadata) — proves
+  //    the type tags (json/num/bool/nullable) are internally consistent.
+  function rowFrom(c, rec){
+    const schema = SheetsSync.SCHEMA[c], jf = SheetsSync.JSON_FIELDS[c]||[];
+    return schema.map(function(f){
+      const v = rec[f];
+      if(v === undefined || v === null) return '';
+      if(jf.indexOf(f) >= 0) return JSON.stringify(v);
+      return String(v);
+    });
+  }
+  function recFrom(c, row){
+    const schema = SheetsSync.SCHEMA[c], jf = SheetsSync.JSON_FIELDS[c]||[];
+    const obj = {};
+    schema.forEach(function(f, i){
+      let v = i < row.length ? row[i] : '';
+      if(jf.indexOf(f) >= 0 && typeof v === 'string' && v){ try{ v = JSON.parse(v); }catch(e){} }
+      else if(SheetsSync.BOOLEAN.indexOf(f) >= 0){ v = v === 'true' || v === true; }
+      else if(SheetsSync.NUMERIC.indexOf(f) >= 0){
+        if(v === '' || v === 'null') v = SheetsSync.NULLABLE.indexOf(f) >= 0 ? null : 0;
+        else { const n = Number(v); v = isNaN(n) ? v : n; }
+      }
+      else if(v === 'null'){ v = SheetsSync.NULLABLE.indexOf(f) >= 0 ? null : ''; }
+      obj[f] = v;
+    });
+    return obj;
+  }
+  const samples = {
+    daily: { submission_id:'s1', entry_date:'2026-05-28', backfilled:false, valence:0.42,
+             valence_log:[{v:0.42,at:'10:00'}], body_sensations:['Tension'], body_tension_where:'neck',
+             body_other:'', sleep_bedtime:'23:00', sleep_onset:'23:30', sleep_wakes:2,
+             sleep_wake_time:'07:00', sleep_quality:'3', biological_fact:'ate', note:'hi', _field_ts:{valence:123} },
+    assess: { submission_id:'s2', entry_date:'2026-05-26', phq9_items:[1,2,3,0,1,2,1,0,1], phq9_total:11,
+              phq9_complete:true, gad7_items:[1,1,1,1,1,1,1], gad7_total:7, gad7_complete:true,
+              functional_difficulty:'Somewhat difficult', _field_ts:{phq9_total:1} },
+    meds: { submission_id:'s3', entry_date:'2026-05-28', backfilled:false,
+            entries:[{id:'e1',medication:'zolon',tablets:'1',_ts:1}], _field_ts:{entries:1} }
+  };
+  ['daily','assess','meds'].forEach(function(c){
+    const rec = samples[c];
+    const round = recFrom(c, rowFrom(c, rec));
+    SheetsSync.SCHEMA[c].forEach(function(f){
+      check('roundtrip ['+c+'.'+f+']', round[f], rec[f] === undefined ? '' : rec[f]);
+    });
+  });
+
+  const failed = results.filter(function(r){ return !r.pass; });
+  if(failed.length) console.error('[PPT selftest] ' + failed.length + '/' + results.length + ' FAILED:', failed);
+  else console.warn('[PPT selftest] all ' + results.length + ' checks passed ✓');
+  return { pass: failed.length === 0, total: results.length, failed: failed };
+}
+
 (async function appInit(){
+  if(location.search.indexOf('selftest') >= 0) _runSelfTest();
   rebuildAssessItems();
   loadDaily(todayISO());
   loadAssess(todayISO());
