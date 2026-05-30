@@ -1922,6 +1922,41 @@ function _asArr(v){
   return [];
 }
 
+// True if v is (or is a JSON string of) a _field_ts-style timestamp map: an object whose
+// values are all numbers and whose keys are field names. Used to detect the column-shift
+// where the old _field_ts column lands in `note`.
+function _isTsMap(v){
+  let o = v;
+  if(typeof v === 'string'){ const s = v.trim(); if(s.charAt(0) !== '{') return false; try { o = JSON.parse(s); } catch(e){ return false; } }
+  if(!o || typeof o !== 'object' || Array.isArray(o)) return false;
+  const keys = Object.keys(o);
+  if(!keys.length || !keys.every(function(k){ return typeof o[k] === 'number'; })) return false;
+  return keys.indexOf('valence') >= 0 || keys.indexOf('backfilled') >= 0 || keys.indexOf('note') >= 0;
+}
+
+// Old-layout sheets predate the valence_log column, so a positional-era read shifted every
+// daily field after `valence` by +1 (the _field_ts map ended up in `note`). When we detect
+// that signature, return a CORRECTED COPY with fields un-shifted. Non-destructive: stored
+// data is never mutated; this only fixes what's displayed / loaded into the form. Idempotent
+// (a corrected record's note is plain text, so it won't match again). Self-heals on next save.
+function _repairDailyShift(d){
+  if(!d || !_isTsMap(d.note)) return d;
+  const r = Object.assign({}, d);
+  r._field_ts = (typeof d.note === 'string') ? (function(){ try { return JSON.parse(d.note); } catch(e){ return {}; } })() : d.note;
+  r.note = d.biological_fact;
+  r.biological_fact = d.sleep_quality;
+  r.sleep_quality = d.sleep_wake_time;
+  r.sleep_wake_time = d.sleep_wakes;
+  r.sleep_wakes = d.sleep_onset;
+  r.sleep_onset = d.sleep_bedtime;
+  r.sleep_bedtime = d.body_other;
+  r.body_other = d.body_tension_where;
+  r.body_tension_where = d.body_sensations;
+  r.body_sensations = _asArr(d.valence_log);
+  r.valence_log = [];
+  return r;
+}
+
 function renderValenceLog(log){
   const el = $('#d_valence_log');
   if(!el) return;
@@ -1995,7 +2030,7 @@ function loadDaily(date){
   if(!date) return;
   $('#d_date').value = date;
   clearDailyForm();
-  const rec = Store.getByDate('daily', date);
+  const rec = _repairDailyShift(Store.getByDate('daily', date));
   if(rec){
     valSlider.value = Math.round((rec.valence ?? 0) * 100);
     updateValence();
@@ -2458,7 +2493,7 @@ function _renderDateHTML(date, e){
   const valTag = tags.join(' · ') || '—';
   let body='<dl>';
   if(e.daily){
-    const d=e.daily;
+    const d=_repairDailyShift(e.daily);
     const vlog = Array.isArray(d.valence_log) ? d.valence_log : [];
     if(vlog.length > 1){
       const readings = vlog
