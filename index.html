@@ -582,7 +582,6 @@ const Store = {
   },
 
   async hydrateFromCloud() {
-    if (_hydrating) return; // re-entrancy guard: avoid overlapping read-merge-commit cycles
     if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._hydrateFromSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
@@ -719,7 +718,6 @@ const Store = {
   },
 
   async _hydrateFromSheets() {
-    if (_hydrating) return; // re-entrancy guard (also reachable directly via hydrateFromCloud delegation)
     if (!navigator.onLine) return;
     _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
