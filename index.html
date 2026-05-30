@@ -1934,13 +1934,24 @@ function _isTsMap(v){
   return keys.indexOf('valence') >= 0 || keys.indexOf('backfilled') >= 0 || keys.indexOf('note') >= 0;
 }
 
-// Old-layout sheets predate the valence_log column, so a positional-era read shifted every
-// daily field after `valence` by +1 (the _field_ts map ended up in `note`). When we detect
-// that signature, return a CORRECTED COPY with fields un-shifted. Non-destructive: stored
-// data is never mutated; this only fixes what's displayed / loaded into the form. Idempotent
-// (a corrected record's note is plain text, so it won't match again). Self-heals on next save.
+// Detect a daily record whose columns were shifted +1 by the old positional read of a
+// pre-valence_log sheet. Correct records carry a real _field_ts object; shifted ones have
+// the old _field_ts displaced into `note` (a timestamp map, or the literal "" when it was
+// empty) and body_sensations displaced into valence_log (an array of plain strings).
+function _isDailyShifted(d){
+  if(!d) return false;
+  if(d._field_ts && typeof d._field_ts === 'object' && !Array.isArray(d._field_ts)) return false; // already correct
+  if(_isTsMap(d.note)) return true;
+  if(d.note === '""') return true;
+  if(Array.isArray(d.valence_log) && d.valence_log.length && typeof d.valence_log[0] === 'string') return true;
+  return false;
+}
+
+// When a record is shifted, return a CORRECTED COPY with fields un-shifted. Non-destructive:
+// stored data is never mutated; this only fixes what's displayed / loaded into the form.
+// Idempotent (a corrected record fails _isDailyShifted, so it won't be touched again).
 function _repairDailyShift(d){
-  if(!d || !_isTsMap(d.note)) return d;
+  if(!d || !_isDailyShifted(d)) return d;
   const r = Object.assign({}, d);
   r._field_ts = (typeof d.note === 'string') ? (function(){ try { return JSON.parse(d.note); } catch(e){ return {}; } })() : d.note;
   r.note = d.biological_fact;
