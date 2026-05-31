@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>monitor</title>
+<!-- PPT (Personal Psychosomatic Tracker) — v4.9.9 · final single-file release before the
+     v5.x "Layer 0" groundwork branch (modularization + versioned migration framework). -->
+
 <style>
 :root {
   --bg: #e8e6df;
@@ -85,7 +88,10 @@ input[type=range].valence::-moz-range-thumb {
 }
 .valence-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.03em; }
 .valence-time { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-soft); margin-top: 10px; letter-spacing: 0.03em; }
-.valence-time .vt-now { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.valence-time input.vt-now { width: auto; padding: 2px 6px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mood-toggle { border: 1.5px solid var(--line-strong); background: #9c3a2f; color: var(--bg); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; border-radius: 0; transition: background 0.12s; }
+.mood-toggle.on { background: #3a7d4f; }
+.mood-toggle:hover { filter: brightness(1.08); }
 .valence-time .vt-refresh { background: var(--field); border: 1px solid var(--line-strong); cursor: pointer; font-family: var(--mono); font-size: 12px; line-height: 1; padding: 2px 7px; color: var(--ink-soft); border-radius: 0; }
 .valence-time .vt-refresh:hover { background: var(--ink); color: var(--bg); }
 
@@ -225,8 +231,8 @@ input[type=range].valence::-moz-range-thumb {
     </div>
     <nav class="tabs">
       <button type="button" data-seg="daily" class="active" data-i18n="tab_daily">Daily</button>
-      <button type="button" data-seg="assess" data-i18n="tab_assess">Assessment</button>
       <button type="button" data-seg="meds" data-i18n="tab_meds">Medication</button>
+      <button type="button" data-seg="assess" data-i18n="tab_assess">Assessment</button>
       <button type="button" data-seg="log" data-i18n="tab_log">Log</button>
     </nav>
   </div>
@@ -244,7 +250,7 @@ input[type=range].valence::-moz-range-thumb {
   </label>
 
   <div class="block">
-    <div class="block-title"><span data-i18n="mood">Mood</span> <span class="hint" data-i18n="mood_hint">how does this moment feel</span></div>
+    <div class="block-title"><span data-i18n="mood">Mood</span> <button type="button" id="d_mood_toggle" class="mood-toggle" data-i18n="log_mood_btn" aria-pressed="true">Log Mood</button></div>
     <div class="valence-wrap">
       <div class="valence-readout" id="valReadout">—<span class="vnum"></span></div>
       <div class="valence-track"></div>
@@ -255,9 +261,9 @@ input[type=range].valence::-moz-range-thumb {
         <span data-i18n="val_very_pleasant">very pleasant</span>
       </div>
       <div class="valence-time">
-        <span data-i18n="will_log_at">records at</span>
-        <span id="d_valence_time" class="vt-now">—</span>
-        <button type="button" id="btn_valence_time_refresh" class="vt-refresh" onclick="refreshValenceTime()" data-i18n-title="refresh_time" title="Refresh to current time">↻</button>
+        <span id="d_valence_time_label" data-i18n="will_log_at">records at</span>
+        <input type="time" id="d_valence_time" class="vt-now">
+        <button type="button" id="btn_valence_time_refresh" class="vt-refresh" onclick="refreshValenceTime()" data-i18n-title="refresh_time" title="Set to current time">↻</button>
       </div>
       <div id="d_valence_log" class="valence-log"></div>
     </div>
@@ -1547,7 +1553,9 @@ const I18N = {
   entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
   val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
   mood_log_head:{en:'Earlier readings',zh:'先前記錄'}, mood_log_at:{en:'at',zh:'於'},
-  will_log_at:{en:'records at',zh:'記錄於'}, refresh_time:{en:'Refresh to current time',zh:'更新為目前時間'},
+  will_log_at:{en:'records at',zh:'記錄於'}, refresh_time:{en:'Set to current time',zh:'設為目前時間'},
+  reading_time_opt:{en:'reading time (optional)',zh:'記錄時間（選填）'},
+  log_mood_btn:{en:'Log Mood',zh:'記錄情緒'},
   body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
   other_describe:{en:'other — describe',zh:'其他 — 描述'}, tension_where:{en:'tension — where?',zh:'緊繃 — 哪裡？'},
   bio_fact:{en:'Biological fact',zh:'生理事實'}, bio_hint:{en:'ate / slept / pain / etc.',zh:'飲食 / 睡眠 / 疼痛等'},
@@ -1860,6 +1868,7 @@ function renderI18n(){
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   $$('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
+  { const _vtl = $('#d_valence_time_label'); if(_vtl) _vtl.textContent = _isBackfillDate() ? t('reading_time_opt') : t('will_log_at'); }
   $$('option[data-i18n-opt]').forEach(opt=>{ opt.textContent = t(opt.dataset.i18nOpt); });
   $$('#d_body .chip').forEach(c=>{ c.textContent = t(c.dataset.val); });
   rebuildAssessItems();
@@ -1887,7 +1896,6 @@ function switchSeg(seg){
   $$('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.seg===seg));
   $$('.seg').forEach(x=>x.classList.remove('active'));
   $('#seg-'+seg).classList.add('active');
-  if(seg==='daily') refreshValenceTime();
   if(seg==='log'){ _logLimit = _LOG_PAGE; renderLog(); }
   if(seg==='assess') refreshDueBanner();
   if(seg==='meds') renderMedLedger();
@@ -1912,6 +1920,10 @@ function updateValence(){
   r.style.color = valColor(v);
 }
 valSlider.addEventListener('input', updateValence);
+// Touching the slider implies intent to log → auto-unlock (only on the off→on transition,
+// so dragging doesn't keep resetting the time field).
+valSlider.addEventListener('input', function(){ const b=$('#d_mood_toggle'); if(b && !b.classList.contains('on')) setMoodToggle(true); });
+$('#d_mood_toggle').addEventListener('click', function(){ setMoodToggle(!this.classList.contains('on')); });
 
 // Coerce a possibly-legacy value into an array. Cloud rows can hold array fields
 // (body_sensations, etc.) as a plain string when an old non-JSON value fails to parse;
@@ -1985,10 +1997,37 @@ function renderValenceLog(log){
   el.innerHTML = any ? html : '';
 }
 
-// Time that the next valence reading will be stamped with. Manually refreshable
-// (a snapshot rather than a live clock) — saveDaily records exactly this value.
+// Time the next valence reading will be stamped with — an editable snapshot (not a live
+// clock); saveDaily records exactly this value. For TODAY it defaults to now; when
+// BACKFILLING a past date it is left blank (auto-now would be wrong), so the user can
+// optionally pick the time the reading actually belongs to, or leave it empty.
 function currentLogTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
-function refreshValenceTime(){ const el=$('#d_valence_time'); if(el) el.textContent = currentLogTime(); }
+function _isBackfillDate(){ const v = $('#d_date') && $('#d_date').value; return !!v && v < todayISO(); }
+function refreshValenceTime(){ const el=$('#d_valence_time'); if(el) el.value = currentLogTime(); } // the ↻ button: set to now
+function _resetValenceTime(){
+  const el=$('#d_valence_time'); if(!el) return;
+  const backfill = _isBackfillDate();
+  el.value = backfill ? '' : currentLogTime();
+  const lab = $('#d_valence_time_label');
+  if(lab) lab.textContent = backfill ? t('reading_time_opt') : t('will_log_at');
+}
+// Mood-logging toggle. Locked (red) = this Save will NOT add a mood reading; unlocked
+// (green) = it will, with whatever value the slider holds (including neutral). The time
+// field is only shown while unlocked. Defaults unlocked on a NEW day (so a full first
+// entry is one tap) and locked when revisiting an existing day (so later edits to
+// sleep/note don't stack phantom readings).
+function setMoodToggle(on){
+  const btn = $('#d_mood_toggle'); if(!btn) return;
+  btn.classList.toggle('on', !!on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const vt = $('.valence-time'); if(vt) vt.style.display = on ? 'flex' : 'none';
+  if(on) _resetValenceTime();
+}
+function _resetMoodToggle(){
+  const date = $('#d_date') && $('#d_date').value;
+  const existing = date && Store.getByDate('daily', date);
+  setMoodToggle(!existing);
+}
 
 const bodyWrap = $('#d_body');
 BODY_SENSATIONS.forEach(s=>{
@@ -2035,7 +2074,7 @@ function clearDailyForm(){
   $('#d_sleep_quality').value='';
   $('#d_bio').value=''; $('#d_note').value='';
   renderValenceLog(null);
-  refreshValenceTime();
+  _resetMoodToggle();
 }
 function loadDaily(date){
   if(!date) return;
@@ -2074,18 +2113,27 @@ function saveDaily(){
     const rec = collectDaily();
     if(existing) rec.submission_id = existing.submission_id;
     // Append current reading to valence_log
-    const prevLog = (existing && existing.valence_log) || [];
-    const timeEl = $('#d_valence_time');
-    const timeStr = (timeEl && /^\d{2}:\d{2}$/.test(timeEl.textContent)) ? timeEl.textContent : currentLogTime();
-    rec.valence_log = prevLog.concat([{ v: rec.valence, at: timeStr }]);
+    const prevLog = (existing && Array.isArray(existing.valence_log)) ? existing.valence_log : [];
+    if($('#d_mood_toggle').classList.contains('on')){
+      // Mood logging unlocked → append one reading (any value, including neutral).
+      const timeEl = $('#d_valence_time');
+      let timeStr = (timeEl && /^\d{2}:\d{2}$/.test(timeEl.value)) ? timeEl.value : '';
+      // Auto-fill "now" only for today's entries; a blank backfill time stays blank on purpose.
+      if(!timeStr && !rec.backfilled) timeStr = currentLogTime();
+      rec.valence_log = prevLog.concat([{ v: rec.valence, at: timeStr }]);
+    } else {
+      // Locked → don't add a reading; preserve the day's existing mood snapshot + history.
+      rec.valence = existing ? existing.valence : null;
+      rec.valence_log = prevLog;
+    }
     Store.put('daily', rec);
     toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
     updateDailySub();
     renderValenceLog(rec.valence_log);
-    refreshValenceTime();
+    _resetValenceTime();
   });
 }
-function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); updateZolonDisplay(); }
+function resetDaily(){ $('#d_date').value = todayISO(); clearDailyForm(); updateDailySub(); updateZolonDisplay(); }
 $('#d_date').addEventListener('change', ()=>loadDaily($('#d_date').value));
 
 function getAssessItemText(itemsEn, itemsZh, i){
@@ -2594,11 +2642,25 @@ $('#logList').addEventListener('click', e=>{
   editFromLog(btn.dataset.date, btn.dataset.coll);
 });
 
+// Guard against the silent-empty-export footgun: warn if there's nothing to export, or if
+// cloud data is still loading — so a good backup can't be quietly overwritten by an empty
+// file exported before hydration finished. Returns false to cancel the export.
+function _exportGuard(){
+  const d = Store._all();
+  const total = d.daily.length + d.assess.length + d.meds.length;
+  if(typeof _hydrating !== 'undefined' && _hydrating)
+    return confirm(currentLang==='zh' ? '資料仍在從雲端載入中，現在匯出可能不完整。仍要匯出嗎？' : 'Data is still loading from the cloud — exporting now may be incomplete. Export anyway?');
+  if(total === 0)
+    return confirm(currentLang==='zh' ? '沒有可匯出的資料（可能尚未載入或已登出）。仍要匯出空檔案嗎？' : 'No entries to export — data may not have loaded yet, or you may be signed out. Export an empty file anyway?');
+  return true;
+}
 function exportJSON(){
+  if(!_exportGuard()) return;
   const blob=new Blob([JSON.stringify(Store.exportClean(),null,2)],{type:'application/json'});
   dl(blob, `monitor_export_${todayISO()}.json`);
 }
 function exportCSV(){
+  if(!_exportGuard()) return;
   const all=Store.exportClean(); const rows=[['collection','entry_date','submission_id','field','value']];
   ['daily','assess','meds'].forEach(coll=>all[coll].forEach(r=>{
     Object.entries(r).forEach(([k,v])=>{
@@ -2720,7 +2782,9 @@ $('#brandBtn').addEventListener('click', ()=>{
 });
 
 $('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
-$('#googleSignOut').addEventListener('click', ()=>{ GoogleAuth.signOut(); });
+$('#googleSignOut').addEventListener('click', ()=>{
+  if(confirm(currentLang==='zh' ? '登出將清除此裝置上的本機資料（雲端試算表會保留）。確定要登出嗎？' : 'Sign out? This clears local data on this device — your cloud sheet is kept.')) GoogleAuth.signOut();
+});
 $('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
 
 // Tap sync indicator → diagnostic info (helps debug Safari / multi-sheet issues)
@@ -2924,12 +2988,16 @@ function _migrateDailyShift(){
 
 (async function appInit(){
   if(location.search.indexOf('selftest') >= 0) _runSelfTest();
-  rebuildAssessItems();
-  loadDaily(todayISO());
-  loadAssess(todayISO());
-  loadMeds(todayISO());
-  refreshDueBanner();
-  renderI18n();
+  // Guard the initial render so a bad record can't block auth/sync bootstrap below —
+  // hydration may then pull/repair the data and re-render in place.
+  try {
+    rebuildAssessItems();
+    loadDaily(todayISO());
+    loadAssess(todayISO());
+    loadMeds(todayISO());
+    refreshDueBanner();
+    renderI18n();
+  } catch(e){ console.error('[PPT] Initial render failed — continuing to sync/auth init', e); }
 
   await Store.hydrateFromCloud();
   _migrateDailyShift();
