@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>monitor</title>
+<!-- PPT (Personal Psychosomatic Tracker) — v4.9.9 · final single-file release before the
+     v5.x "Layer 0" groundwork branch (modularization + versioned migration framework). -->
+
 <style>
 :root {
   --bg: #e8e6df;
@@ -84,6 +87,13 @@ input[type=range].valence::-moz-range-thumb {
   width: 16px; height: 30px; background: var(--field); border: 1.5px solid var(--line-strong); border-radius: 0; cursor: pointer;
 }
 .valence-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.03em; }
+.valence-time { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-soft); margin-top: 10px; letter-spacing: 0.03em; }
+.valence-time input.vt-now { width: auto; padding: 2px 6px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mood-toggle { border: 1.5px solid var(--line-strong); background: #9c3a2f; color: var(--bg); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 14px; cursor: pointer; border-radius: 0; transition: background 0.12s; }
+.mood-toggle.on { background: #3a7d4f; }
+.mood-toggle:hover { filter: brightness(1.08); }
+.valence-time .vt-refresh { background: var(--field); border: 1px solid var(--line-strong); cursor: pointer; font-family: var(--mono); font-size: 12px; line-height: 1; padding: 2px 7px; color: var(--ink-soft); border-radius: 0; }
+.valence-time .vt-refresh:hover { background: var(--ink); color: var(--bg); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
@@ -146,7 +156,7 @@ input[type=range].valence::-moz-range-thumb {
 .log-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
 .log-body dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 12px; margin-top: 10px; }
 .log-body dt { color: var(--mid); }
-.log-body dd { color: var(--ink); }
+.log-body dd { color: var(--ink); min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .log-edit { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-log-edit {
   background: var(--field); border: 1px solid var(--line-strong); padding: 5px 10px;
@@ -169,16 +179,50 @@ input[type=range].valence::-moz-range-thumb {
 .tyn:hover { background: #ece9e1; }
 .tyn.on { background: var(--ink); color: var(--bg); font-weight: 700; }
 
+.valence-log { font-size: 11px; color: var(--ink-soft); margin-top: 10px; line-height: 1.6; }
+.valence-log:empty { display: none; }
+.valence-log .vl-head { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); margin-bottom: 4px; }
+.valence-log .vl-entry { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid var(--line); }
+.valence-log .vl-entry:last-child { border-bottom: none; }
 .zolon-auto { font-size: 12px; color: var(--ink-soft); padding: 8px 0 4px; line-height: 1.5; }
 .zolon-auto .zolon-val { color: var(--ink); font-weight: 600; }
 .zolon-caution { font-size: 10px; color: var(--mid); margin-top: 2px; letter-spacing: 0.01em; }
+
+.auth-area { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.auth-sep { font-size: 10px; color: var(--mid); letter-spacing: 0.03em; }
+.auth-user { font-size: 11px; color: var(--ink-soft); display: flex; align-items: baseline; gap: 6px; }
+.btn-signout { background: none; border: none; font-family: var(--mono); font-size: 10px; color: var(--mid); text-decoration: underline; cursor: pointer; padding: 0; letter-spacing: 0.03em; }
+.btn-signout:hover { color: var(--ink); }
+.btn-persist { background: none; border: 1px solid var(--line); padding: 2px 7px; font-family: var(--mono); font-size: 9px; color: var(--mid); cursor: pointer; letter-spacing: 0.04em; border-radius: 0; }
+.btn-persist:hover { border-color: var(--ink); color: var(--ink); }
+.btn-signin { background: var(--field); border: 1px solid var(--line-strong); padding: 4px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; letter-spacing: 0.03em; }
+.btn-signin:hover { background: var(--ink); color: var(--bg); }
+.tpl-item { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.tpl-item:last-child { border-bottom: none; }
+.tpl-item .tpl-name { font-weight: 600; }
+.tpl-item .tpl-fields { color: var(--mid); font-size: 10px; margin-left: 8px; }
+.tpl-item .btn-rm-tpl { background: none; border: none; font-family: var(--mono); font-size: 14px; color: var(--mid); cursor: pointer; padding: 0 4px; }
+.tpl-item .btn-rm-tpl:hover { color: var(--neg); }
+.btn-reset-tpl { background: none; border: none; font-family: var(--mono); font-size: 10px; color: var(--mid); text-decoration: underline; cursor: pointer; padding: 0; margin-top: 10px; display: block; }
+.btn-reset-tpl:hover { color: var(--ink); }
 </style>
+<script src="https://accounts.google.com/gsi/client" async></script>
 </head>
 <body>
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <span id="brandBtn" style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; letter-spacing:0.05em;" title="Click to set Sync URL">Endpoint URL</span>
+      <div class="auth-area">
+        <span id="brandBtn" style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; letter-spacing:0.05em;" title="Click to set Sync URL" data-i18n="auth_endpoint">Endpoint URL</span>
+        <span id="authSep" class="auth-sep" data-i18n="auth_or">or</span>
+        <button type="button" id="googleSignIn" class="btn-signin" data-i18n="auth_signin">Sign in with Google</button>
+        <span id="googleUser" class="auth-user" style="display:none;">
+          <span id="googleEmail"></span>
+          <button type="button" id="googlePersist" class="btn-persist" title="Session persistence">session</button>
+          <span class="auth-sep">·</span>
+          <button type="button" id="googleSignOut" class="btn-signout" data-i18n="auth_signout">Sign out</button>
+        </span>
+      </div>
       <div class="header-right">
         <span class="datestamp" id="todayStamp"></span>
         <span id="syncIndicator" style="font-size: 11px; margin-left: 10px; font-weight: 700;"></span>
@@ -187,8 +231,8 @@ input[type=range].valence::-moz-range-thumb {
     </div>
     <nav class="tabs">
       <button type="button" data-seg="daily" class="active" data-i18n="tab_daily">Daily</button>
-      <button type="button" data-seg="assess" data-i18n="tab_assess">Assessment</button>
       <button type="button" data-seg="meds" data-i18n="tab_meds">Medication</button>
+      <button type="button" data-seg="assess" data-i18n="tab_assess">Assessment</button>
       <button type="button" data-seg="log" data-i18n="tab_log">Log</button>
     </nav>
   </div>
@@ -206,7 +250,7 @@ input[type=range].valence::-moz-range-thumb {
   </label>
 
   <div class="block">
-    <div class="block-title"><span data-i18n="mood">Mood</span> <span class="hint" data-i18n="mood_hint">how does this moment feel</span></div>
+    <div class="block-title"><span data-i18n="mood">Mood</span> <button type="button" id="d_mood_toggle" class="mood-toggle" data-i18n="log_mood_btn" aria-pressed="true">Log Mood</button></div>
     <div class="valence-wrap">
       <div class="valence-readout" id="valReadout">—<span class="vnum"></span></div>
       <div class="valence-track"></div>
@@ -216,6 +260,12 @@ input[type=range].valence::-moz-range-thumb {
         <span data-i18n="val_neutral">neutral</span>
         <span data-i18n="val_very_pleasant">very pleasant</span>
       </div>
+      <div class="valence-time">
+        <span id="d_valence_time_label" data-i18n="will_log_at">records at</span>
+        <input type="time" id="d_valence_time" class="vt-now">
+        <button type="button" id="btn_valence_time_refresh" class="vt-refresh" onclick="refreshValenceTime()" data-i18n-title="refresh_time" title="Set to current time">↻</button>
+      </div>
+      <div id="d_valence_log" class="valence-log"></div>
     </div>
   </div>
 
@@ -252,14 +302,14 @@ input[type=range].valence::-moz-range-thumb {
       <span class="lab" data-i18n="sleep_quality_label">Sleep Quality (optional)</span>
       <select id="d_sleep_quality">
         <option value="">—</option>
-        <option value="poor" data-i18n-opt="sq_poor">Poor</option>
-        <option value="fair" data-i18n-opt="sq_fair">Fair</option>
-        <option value="ok" data-i18n-opt="sq_ok">OK</option>
-        <option value="good" data-i18n-opt="sq_good">Good</option>
+        <option value="4" data-i18n-opt="sq_4">Good</option>
+        <option value="3" data-i18n-opt="sq_3">Fair</option>
+        <option value="2" data-i18n-opt="sq_2">Poor</option>
+        <option value="1" data-i18n-opt="sq_1">Awful</option>
       </select>
     </label>
     <div class="zolon-auto" id="d_sleep_zolon"></div>
-    <div class="zolon-caution" data-i18n="sleep_zolon_caution">Assumes doses before 4:00 AM belong to the previous night.</div>
+    <div class="zolon-caution" data-i18n="sleep_zolon_caution">Assumes doses before 6:00 AM belong to the previous night.</div>
   </div>
 
   <div class="block">
@@ -345,6 +395,29 @@ input[type=range].valence::-moz-range-thumb {
   </div>
 
   <div class="block">
+    <div class="block-title">
+      <span data-i18n="manage_templates">Manage templates</span>
+      <button type="button" class="btn-ghost" id="btn_toggle_tpl_editor" style="padding:3px 10px;font-size:10px;letter-spacing:0.06em;" data-i18n="tpl_toggle">edit</button>
+    </div>
+    <div id="tpl_editor" style="display:none;">
+      <div id="tpl_list"></div>
+      <div class="tpl-add" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">
+        <label class="fld"><span class="lab" data-i18n="tpl_name">Drug name</span><input type="text" id="tpl_new_name" placeholder="e.g. Lexapro 10mg"></label>
+        <div class="lab" style="margin-bottom:6px;" data-i18n="tpl_fields">Fields to track</div>
+        <div class="chips" id="tpl_field_chips"></div>
+        <div class="row" style="margin-top:10px;">
+          <label class="fld"><span class="lab" data-i18n="tpl_mg">mg per tablet (optional)</span><input type="number" id="tpl_new_mg" step="any" min="0" style="max-width:120px;"></label>
+          <label class="fld"><span class="lab" data-i18n="tpl_multi">Multiple per day?</span>
+            <div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('tpl_new_multi','true',this)" data-i18n="yes">Yes</button><button type="button" class="tyn" onclick="setToggle('tpl_new_multi','false',this)" data-i18n="no">No</button></div>
+            <input type="hidden" id="tpl_new_multi" value="false">
+          </label>
+        </div>
+        <button type="button" class="btn-primary" style="margin-top:8px;" onclick="addCustomTemplate()" data-i18n="tpl_add">Add template</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
     <div class="block-title" data-i18n="todays_ledger">Today's ledger</div>
     <div id="med_ledger"></div>
   </div>
@@ -356,6 +429,8 @@ input[type=range].valence::-moz-range-thumb {
   <div class="export-row">
     <button type="button" class="btn-ghost" onclick="exportJSON()" data-i18n="export_json">Export JSON</button>
     <button type="button" class="btn-ghost" onclick="exportCSV()" data-i18n="export_csv">Export CSV</button>
+    <button type="button" class="btn-ghost" onclick="$('#importFile').click()" data-i18n="import_json">Import JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
   </div>
   <div id="logList"></div>
 </section>
@@ -371,20 +446,30 @@ const Store = {
   _key: 'monitor_v1',
   get endpoint() { return localStorage.getItem('monitor_endpoint'); },
 
+  _cache: null,
   _all() {
-    try { return JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
-    catch(e){ return {daily:[],assess:[],meds:[]}; }
+    if (this._cache) return this._cache;
+    try { this._cache = JSON.parse(localStorage.getItem(this._key)) || {daily:[],assess:[],meds:[]}; }
+    catch(e){ this._cache = {daily:[],assess:[],meds:[]}; }
+    return this._cache;
   },
-  _commit(d){ localStorage.setItem(this._key, JSON.stringify(d)); },
+  _commit(d){
+    this._cache = d;
+    try { localStorage.setItem(this._key, JSON.stringify(d)); }
+    catch(e){ console.error('Storage write failed (quota/private mode)', e); toast('Storage full — data not saved'); }
+  },
   getByDate(coll, date){
     const d = this._all();
-    return d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
+    const rec = d[coll].filter(r => r.entry_date === date).sort((a,b)=>b.submission_id.localeCompare(a.submission_id))[0] || null;
+    // Deep-clone to fully isolate nested arrays (body_sensations, entries, phq9_items, etc.)
+    return rec ? structuredClone(rec) : null;
   },
   list(coll){ return this._all()[coll]; },
   everything(){ return this._all(); },
   exportClean(){
-    const d = this._all();
-    ['daily','assess','meds'].forEach(c => d[c].forEach(r => delete r._dirty));
+    const d = JSON.parse(JSON.stringify(this._all()));
+    ['daily','assess','meds'].forEach(c => d[c].forEach(r => { delete r._dirty; delete r._dirty_fields; }));
+    d.version = 1;
     return d;
   },
   deleteBySubmission(coll, submission_id){
@@ -402,16 +487,50 @@ const Store = {
 
   put(coll, record) {
     const d = this._all();
+    const existing = d[coll].find(r => r.submission_id === record.submission_id);
+    const now = Date.now();
+    const fts = Object.assign({}, (existing && existing._field_ts) || {}, record._field_ts || {});
+    // Accumulate dirty fields: preserve previously dirty + detect new changes
+    const prevDirty = (existing && existing._dirty && existing._dirty_fields) || [];
+    const dirtySet = {};
+    prevDirty.forEach(function(f){ dirtySet[f] = true; });
+    const fields = _MUTABLE_FIELDS[coll] || [];
+    if(!existing){
+      // New record — all populated fields are dirty
+      fields.forEach(function(f){ dirtySet[f] = true; if(!fts[f]) fts[f] = now; });
+    } else {
+      // Existing — detect which fields actually changed
+      fields.forEach(function(f){
+        if(JSON.stringify(existing[f]) !== JSON.stringify(record[f])){
+          dirtySet[f] = true;
+          fts[f] = now;
+        }
+      });
+    }
+    record._field_ts = fts;
+    record._dirty_fields = Object.keys(dirtySet);
     record._dirty = true;
     const i = d[coll].findIndex(r => r.submission_id === record.submission_id);
     if (i >= 0) d[coll][i] = record; else d[coll].push(record);
     this._commit(d);
 
+    // Touch idle timer for 30d persist mode
+    if(typeof _getPersistMode === 'function' && _getPersistMode() === '30d'){
+      localStorage.setItem(_ACTIVE_KEY, String(Date.now()));
+    }
+
     if (typeof updateSyncUI === 'function') updateSyncUI();
-    this.syncQueue();
+    this._debouncedSync();
+  },
+
+  _syncTimer: null,
+  _debouncedSync() {
+    if (this._syncTimer) clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => { this._syncTimer = null; this.syncQueue(); }, 2000);
   },
 
   async syncQueue() {
+    if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._syncToSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) {
       if (typeof updateSyncUI === 'function') updateSyncUI();
@@ -439,9 +558,12 @@ const Store = {
             if (result.status === "success") {
               rec._dirty = false;
               updated = true;
+              _syncError = false;
             }
           } catch (e) {
             console.error("Sync failed for record", rec.submission_id, e);
+            _syncError = true;
+            toast(t('toast_sync_error'));
           } finally {
             if (typeof updateSyncUI === 'function') updateSyncUI();
           }
@@ -449,7 +571,7 @@ const Store = {
       }
     }
 
-    if (updated) this._commit(d);
+    if (updated) { this._commit(d); _lastSyncTs = Date.now(); }
     if (typeof updateSyncUI === 'function') updateSyncUI();
   },
 
@@ -466,19 +588,20 @@ const Store = {
   },
 
   async hydrateFromCloud() {
+    if (typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn) return this._hydrateFromSheets();
     const url = this.endpoint;
     if (!url || !navigator.onLine) return;
+    _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
     try {
       const res = await fetch(url + '?action=getAll');
       const textResult = await res.text();
       const data = JSON.parse(textResult);
       if (data.daily === undefined && data.assess === undefined && data.meds === undefined) return;
 
-      const JSON_FIELDS = {
-        daily: ['body_sensations'],
-        assess: ['phq9_items', 'gad7_items'],
-        meds: ['entries']
-      };
+      // Single source of truth. (Was a stale local literal that omitted valence_log and
+      // _field_ts, so on the endpoint path those came back as unparsed JSON strings —
+      // valence_log-as-string then crashed renderValenceLog.)
+      const JSON_FIELDS = SheetsSync.JSON_FIELDS;
       const clean = (coll, rows) => (rows || []).map(r => {
         (JSON_FIELDS[coll] || []).forEach(f => {
           if (typeof r[f] === 'string') {
@@ -507,23 +630,822 @@ const Store = {
           String(a.submission_id).localeCompare(String(b.submission_id)));
       });
 
+      _lastHydrateTs = Date.now(); _lastHydrateSource = 'endpoint';
       const before = JSON.stringify(this._all());
       const after = JSON.stringify(merged);
       if (before !== after) {
         this._commit(merged);
-        location.reload();
+        // Re-render in place (no page reload — preserves form state)
+        rebuildAssessItems();
+        loadDaily($('#d_date').value || todayISO());
+        loadAssess($('#a_date').value || todayISO());
+        loadMeds($('#m_date').value || todayISO());
+        refreshDueBanner();
+        updateSyncUI();
+        renderI18n();
       }
     } catch (e) {
       console.error('Hydration failed', e);
+    } finally {
+      _hydrating = false; if (typeof updateSyncUI === 'function') updateSyncUI();
     }
+  },
+
+  async _syncToSheets() {
+    if (!navigator.onLine) { if (typeof updateSyncUI === 'function') updateSyncUI(); return; }
+    if (!_claimSyncLock()) return;
+    try {
+      await SheetsSync.ensure();
+      const d = this._all();
+      let updated = false;
+      let anyError = false;
+      for (const coll of ['daily','assess','meds']) {
+        if (!d[coll].some(r => r._dirty)) continue;
+        try {
+          // Read-before-write + field-level merge to prevent cross-device data loss
+          const cloud = await SheetsSync.read(coll);
+          const bySub = {};
+          cloud.forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
+          d[coll].forEach(r => {
+            if (!r || !r.submission_id) return;
+            const cloudRec = bySub[r.submission_id];
+            if (!r._dirty) {
+              // Not dirty: cloud version wins if it exists; else keep local
+              if (!cloudRec) {
+                const c = Object.assign({}, r);
+                delete c._dirty; delete c._dirty_fields;
+                bySub[c.submission_id] = c;
+              }
+              // else: cloud already in bySub, skip stale local copy
+            } else if (!cloudRec) {
+              // Dirty but new (no cloud): add local wholesale
+              const c = Object.assign({}, r);
+              delete c._dirty; delete c._dirty_fields;
+              bySub[c.submission_id] = c;
+            } else {
+              // Dirty + cloud exists: field-level merge
+              const m = _fieldMerge(cloudRec, r);
+              delete m._dirty; delete m._dirty_fields;
+              bySub[m.submission_id] = m;
+            }
+          });
+          const merged = Object.values(bySub).sort((a, b) =>
+            String(a.submission_id).localeCompare(String(b.submission_id)));
+          // Garbage-collect tombstones older than 30 days — all devices have
+          // had ample time to observe the deletion by this point.
+          if (coll === 'meds') {
+            const gcCutoff = Date.now() - 30 * 86400000;
+            merged.forEach(function(rec) {
+              if (rec.entries && Array.isArray(rec.entries)) {
+                rec.entries = rec.entries.filter(function(e) {
+                  return !e._deleted || (e._ts || 0) > gcCutoff;
+                });
+              }
+            });
+          }
+          await SheetsSync.write(coll, merged);
+          d[coll].forEach(r => { r._dirty = false; delete r._dirty_fields; });
+          updated = true;
+        } catch(e) {
+          console.error('Sheets sync failed for ' + coll, e);
+          anyError = true;
+          const detail = e && e.message ? ' (' + e.message + ')' : '';
+          toast(t('toast_sync_error') + detail);
+        } finally {
+          if (typeof updateSyncUI === 'function') updateSyncUI();
+        }
+      }
+      _syncError = anyError;
+      if (updated) { this._commit(d); _lastSyncTs = Date.now(); }
+      if (typeof updateSyncUI === 'function') updateSyncUI();
+    } finally {
+      _releaseSyncLock();
+    }
+  },
+
+  async _hydrateFromSheets() {
+    if (!navigator.onLine) return;
+    _hydrating = true; if (typeof updateSyncUI === 'function') updateSyncUI();
+    try {
+      await SheetsSync.ensure();
+      console.warn('[PPT] Hydrating from sheet:', SheetsSync.id);
+      const cloud = {};
+      let cloudEmpty = true;
+      for (const coll of ['daily','assess','meds']) {
+        cloud[coll] = await SheetsSync.read(coll);
+        if (cloud[coll].length > 0) cloudEmpty = false;
+      }
+      console.warn('[PPT] Cloud records:', cloud.daily.length, 'daily,', cloud.assess.length, 'assess,', cloud.meds.length, 'meds');
+
+      // First sync: cloud is empty, push local data up
+      if (cloudEmpty) {
+        const localTotal = this._all().daily.length + this._all().assess.length + this._all().meds.length;
+        console.warn('[PPT] Cloud is empty — pushing local data up (local has', localTotal, 'records)');
+        if (localTotal === 0) {
+          // Signed in but no data anywhere — warn the user
+          console.warn('[PPT] ⚠ No data in cloud or local. Sheet ID:', SheetsSync.id);
+          toast(currentLang === 'zh'
+            ? '已連接試算表但未找到資料 — 點擊同步狀態查看詳情'
+            : 'Connected to sheet but no data found — tap sync status for details');
+        }
+        await this._syncToSheets();
+        if (typeof updateSyncUI === 'function') updateSyncUI();
+        return;
+      }
+
+      // Normal merge: cloud as base, local dirty fields win per timestamp
+      const local = this._all();
+      const merged = {};
+      ['daily','assess','meds'].forEach(coll => {
+        const bySub = {};
+        (cloud[coll] || []).forEach(r => { if (r && r.submission_id) bySub[r.submission_id] = r; });
+        (local[coll] || []).forEach(r => {
+          if (!r || !r.submission_id) return;
+          if (!r._dirty) return; // not dirty — cloud version wins
+          const cloudRec = bySub[r.submission_id];
+          if (!cloudRec) {
+            bySub[r.submission_id] = r; // no cloud version — keep local
+          } else {
+            // Field-level merge: local dirty fields win if timestamp is newer
+            const m = _fieldMerge(cloudRec, r);
+            m._dirty = true;
+            m._dirty_fields = r._dirty_fields;
+            bySub[m.submission_id] = m;
+          }
+        });
+        merged[coll] = Object.values(bySub).sort((a, b) =>
+          String(a.submission_id).localeCompare(String(b.submission_id)));
+      });
+      _lastHydrateTs = Date.now(); _lastHydrateSource = 'sheets (' + (SheetsSync._bindSource || '?') + ')';
+      const before = JSON.stringify(this._all());
+      const after = JSON.stringify(merged);
+      if (before !== after) {
+        this._commit(merged);
+        // Re-render in place (no page reload — preserves Google auth token)
+        rebuildAssessItems();
+        loadDaily($('#d_date').value || todayISO());
+        loadAssess($('#a_date').value || todayISO());
+        loadMeds($('#m_date').value || todayISO());
+        refreshDueBanner();
+        updateSyncUI();
+        renderI18n();
+      }
+    } catch(e) {
+      console.error('Sheets hydration failed', e);
+      _syncError = true;
+      const detail = e && e.message ? ' (' + e.message + ')' : '';
+      toast(t('toast_sync_error') + detail);
+    } finally {
+      _hydrating = false; if (typeof updateSyncUI === 'function') updateSyncUI();
+    }
+  }
+};
+
+// ---- Sync state ----
+let _syncError = false;
+let _hydrating = false;
+let _authExpired = false;
+let _lastSyncTs = 0;          // timestamp of last successful push to cloud
+let _lastHydrateTs = 0;       // timestamp of last successful pull from cloud
+let _lastHydrateSource = null;// which backend/path produced the last pull
+const _TAB_ID = Math.random().toString(36).slice(2);
+const _SYNC_LOCK_KEY = 'monitor_sync_lock';
+const _SYNC_LOCK_TTL = 30000;
+
+function _claimSyncLock() {
+  try {
+    const raw = localStorage.getItem(_SYNC_LOCK_KEY);
+    if (raw) {
+      const lock = JSON.parse(raw);
+      if (lock.tab !== _TAB_ID && Date.now() - lock.ts < _SYNC_LOCK_TTL) return false;
+    }
+  } catch(e) {}
+  localStorage.setItem(_SYNC_LOCK_KEY, JSON.stringify({ tab: _TAB_ID, ts: Date.now() }));
+  return true;
+}
+
+function _releaseSyncLock() {
+  try {
+    const raw = localStorage.getItem(_SYNC_LOCK_KEY);
+    if (raw) { const lock = JSON.parse(raw); if (lock.tab === _TAB_ID) localStorage.removeItem(_SYNC_LOCK_KEY); }
+  } catch(e) {}
+}
+
+// ---- Google Auth (GIS) ----
+const GOOGLE_CLIENT_ID = '576293248913-oddfuaq3qic51hr92fdjmpq43sr60hpr.apps.googleusercontent.com';
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file email';
+
+const GoogleAuth = {
+  token: null,
+  tokenClient: null,
+  tokenExpiry: null,
+  userEmail: null,
+  _refreshResolve: null,
+
+  init() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
+    this.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_SCOPE,
+      callback: (resp) => this._onToken(resp)
+    });
+  },
+
+  async _onToken(resp) {
+    if (resp.error) {
+      this.token = null;
+      if (this._refreshResolve) { this._refreshResolve(); this._refreshResolve = null; }
+      updateAuthUI();
+      return;
+    }
+    this.token = resp.access_token;
+    this.tokenExpiry = Date.now() + ((resp.expires_in || 3600) * 1000);
+    // Verify drive.file scope was granted (user may uncheck during consent)
+    const granted = resp.scope || '';
+    if (granted && granted.indexOf('drive.file') < 0) {
+      console.warn('drive.file scope not granted:', granted);
+      toast(t('toast_scope_missing'));
+      this.token = null;
+      if (this._refreshResolve) { this._refreshResolve(); this._refreshResolve = null; }
+      updateAuthUI();
+      return;
+    }
+    _authExpired = false;
+    if (this._refreshResolve) {
+      this._fetchEmail(); // fire-and-forget on silent refresh
+      this._refreshResolve();
+      this._refreshResolve = null;
+    } else {
+      await this._fetchEmail(); // await on fresh sign-in so email is available for sheet title
+      localStorage.setItem('monitor_auth_mode', 'google');
+      updateAuthUI();
+      updateSyncUI();
+      Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+    }
+    if(typeof _saveToken === 'function') _saveToken();
+  },
+
+  async _fetchEmail() {
+    try {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + this.token }
+      });
+      if (r.ok) { const info = await r.json(); this.userEmail = info.email || null; if(this.userEmail) localStorage.setItem('monitor_auth_email', this.userEmail); updateAuthUI(); }
+    } catch(e) {}
+  },
+
+  signIn() {
+    if (!this.tokenClient) this.init();
+    if (!this.tokenClient) { toast('Google Sign-In not available'); return; }
+    const isReturning = localStorage.getItem('monitor_auth_mode') === 'google';
+    this.tokenClient.requestAccessToken({ prompt: isReturning ? '' : 'consent' });
+  },
+
+  trySilentSignIn() {
+    if (!this.tokenClient) return;
+    try { this.tokenClient.requestAccessToken({ prompt: '' }); } catch(e) {}
+  },
+
+  signOut() {
+    if (this.token) { try { google.accounts.oauth2.revoke(this.token); } catch(e) {} }
+    this.token = null;
+    this.tokenExpiry = null;
+    this.userEmail = null;
+    localStorage.removeItem('monitor_auth_mode');
+    localStorage.removeItem('monitor_auth_email');
+    // Keep monitor_sheets_id so re-login reuses the same spreadsheet
+    if(typeof _clearTokenStorage === 'function') _clearTokenStorage();
+    // Clear local data and re-render clean slate
+    Store._commit({daily:[],assess:[],meds:[]});
+    _syncError = false;
+    updateAuthUI();
+    updateSyncUI();
+    if(typeof _resetViews === 'function') _resetViews();
+  },
+
+  get isSignedIn() { return !!this.token; },
+
+  async authFetch(url, opts) {
+    if (!this.token) throw new Error('Not signed in');
+    // Proactive token refresh if expiry is within 5 minutes
+    if (this.tokenExpiry && Date.now() > this.tokenExpiry - 300000) {
+      const savedToken = this.token;
+      try { await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this)); }
+      catch(e) { if (!this.token) this.token = savedToken; }
+    }
+    _authExpired = false;
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + this.token });
+    let res = await fetch(url, opts);
+    if (res.status === 401) {
+      await new Promise(function(r) { this._refreshResolve = r; this.tokenClient.requestAccessToken({ prompt: '' }); }.bind(this));
+      if (!this.token) {
+        _authExpired = true;
+        if (typeof updateSyncUI === 'function') updateSyncUI();
+        throw new Error('Token refresh failed — sign in again');
+      }
+      opts.headers['Authorization'] = 'Bearer ' + this.token;
+      res = await fetch(url, opts);
+    }
+    return res;
+  }
+};
+
+// ---- Token Persistence ----
+const _PERSIST_KEY  = 'monitor_persist_mode';
+const _TOKEN_STORE  = 'monitor_saved_token';
+const _ACTIVE_KEY   = 'monitor_last_active';
+const _IDLE_MS      = 30 * 86400000; // 30 days
+
+function _getPersistMode(){ return localStorage.getItem(_PERSIST_KEY) || 'session'; }
+
+function _saveToken(){
+  if(!GoogleAuth.token) return;
+  const mode = _getPersistMode();
+  const blob = JSON.stringify({ t: GoogleAuth.token, e: GoogleAuth.tokenExpiry });
+  if(mode === 'session'){
+    sessionStorage.setItem(_TOKEN_STORE, blob);
+    localStorage.removeItem(_TOKEN_STORE);
+  } else {
+    localStorage.setItem(_TOKEN_STORE, blob);
+    sessionStorage.removeItem(_TOKEN_STORE);
+    if(mode === '30d') localStorage.setItem(_ACTIVE_KEY, String(Date.now()));
+  }
+}
+
+function _restoreToken(){
+  const mode = _getPersistMode();
+  if(mode === '30d'){
+    const la = parseInt(localStorage.getItem(_ACTIVE_KEY) || '0');
+    if(la && Date.now() - la > _IDLE_MS){ _clearTokenStorage(); return false; }
+  }
+  const raw = mode === 'session' ? sessionStorage.getItem(_TOKEN_STORE) : localStorage.getItem(_TOKEN_STORE);
+  if(!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    if(!d || !d.t) return false;
+    // Token still valid (>1 min remaining) — restore directly
+    if(d.e && Date.now() < d.e - 60000){
+      GoogleAuth.token = d.t;
+      GoogleAuth.tokenExpiry = d.e;
+      _authExpired = false;
+      localStorage.setItem('monitor_auth_mode', 'google');
+      updateAuthUI();
+      updateSyncUI();
+      // Await email before hydration — email is needed for Drive sheet search
+      // when Safari ITP has cleared the cached sheet ID from localStorage
+      GoogleAuth._fetchEmail().then(function(){
+        Store.hydrateFromCloud().then(function(){ updateSyncUI(); Store.syncQueue(); });
+      });
+      return true;
+    }
+    // Expired — signal caller to try silent refresh
+    return 'refresh';
+  } catch(e){ return false; }
+}
+
+function _clearTokenStorage(){
+  sessionStorage.removeItem(_TOKEN_STORE);
+  localStorage.removeItem(_TOKEN_STORE);
+  localStorage.removeItem(_ACTIVE_KEY);
+}
+
+function _updatePersistBtn(){
+  const btn = $('#googlePersist');
+  if(!btn) return;
+  const mode = _getPersistMode();
+  const labels = { session:'session', '30d':'30d', forever:'∞' };
+  btn.textContent = labels[mode] || 'session';
+  const tips = {
+    session:{ en:'Survives refresh; logs out on tab close', zh:'重新整理後保留；關閉分頁後登出' },
+    '30d':{ en:'Stay signed in for 30 days of activity', zh:'活動期間保持登入 30 天' },
+    forever:{ en:'Stay signed in until manual sign-out', zh:'保持登入直到手動登出' }
+  };
+  const tip = tips[mode] || tips.session;
+  btn.title = tip[currentLang] || tip.en;
+}
+
+function _cyclePersistMode(){
+  const order = ['session','30d','forever'];
+  const cur = _getPersistMode();
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  _clearTokenStorage();
+  localStorage.setItem(_PERSIST_KEY, next);
+  _saveToken();
+  _updatePersistBtn();
+}
+
+// ---- Data model: single source of truth ----
+// Each collection's fields, in the EXACT column order the cloud sheet uses.
+// type: omitted=text | 'num' | 'bool' | 'json'.  meta=true → identity/bookkeeping column
+// (not user-editable; excluded from _MUTABLE_FIELDS).  nullable=true → empty reads back as null.
+// SheetsSync.SCHEMA / JSON_FIELDS / NUMERIC / BOOLEAN / NULLABLE and _MUTABLE_FIELDS are all
+// DERIVED from this — add or change a field in ONE place. (Guarded by ?selftest.)
+const FIELDS = {
+  daily: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'backfilled', type:'bool' },
+    { k:'valence', type:'num' },
+    { k:'valence_log', type:'json' },
+    { k:'body_sensations', type:'json' },
+    { k:'body_tension_where' },
+    { k:'body_other' },
+    { k:'sleep_bedtime' },
+    { k:'sleep_onset' },
+    { k:'sleep_wakes', type:'num', nullable:true },
+    { k:'sleep_wake_time' },
+    { k:'sleep_quality' },
+    { k:'biological_fact' },
+    { k:'note' },
+    { k:'_field_ts', type:'json', meta:true }
+  ],
+  assess: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'phq9_items', type:'json' },
+    { k:'phq9_total', type:'num' },
+    { k:'phq9_complete', type:'bool' },
+    { k:'gad7_items', type:'json' },
+    { k:'gad7_total', type:'num' },
+    { k:'gad7_complete', type:'bool' },
+    { k:'functional_difficulty' },
+    { k:'_field_ts', type:'json', meta:true }
+  ],
+  meds: [
+    { k:'submission_id', meta:true },
+    { k:'entry_date', meta:true },
+    { k:'backfilled', type:'bool' },
+    { k:'entries', type:'json' },
+    { k:'_field_ts', type:'json', meta:true }
+  ]
+};
+
+function _deriveSchema(){
+  const colls = ['daily','assess','meds'];
+  const SCHEMA = {}, JSON_FIELDS = {}, MUTABLE = {};
+  const NUMERIC = [], BOOLEAN = [], NULLABLE = [];
+  colls.forEach(function(c){
+    SCHEMA[c] = FIELDS[c].map(function(f){ return f.k; });
+    JSON_FIELDS[c] = FIELDS[c].filter(function(f){ return f.type === 'json'; }).map(function(f){ return f.k; });
+    MUTABLE[c] = FIELDS[c].filter(function(f){ return !f.meta; }).map(function(f){ return f.k; });
+    FIELDS[c].forEach(function(f){
+      if(f.type === 'num'  && NUMERIC.indexOf(f.k) < 0) NUMERIC.push(f.k);
+      if(f.type === 'bool' && BOOLEAN.indexOf(f.k) < 0) BOOLEAN.push(f.k);
+      if(f.nullable        && NULLABLE.indexOf(f.k) < 0) NULLABLE.push(f.k);
+    });
+  });
+  return { SCHEMA:SCHEMA, JSON_FIELDS:JSON_FIELDS, NUMERIC:NUMERIC, BOOLEAN:BOOLEAN, NULLABLE:NULLABLE, MUTABLE:MUTABLE };
+}
+const _DERIVED = _deriveSchema();
+
+// ---- Field-level merge helpers ----
+const _MUTABLE_FIELDS = _DERIVED.MUTABLE;
+
+// Deterministic ID for legacy entries lacking one — same content → same ID
+function _legacyEntryId(e, idx){
+  var key = (e.medication || '') + '|' + (e.time || '') + '|' + (e.taken_at || '') + '|' + (e.substance || '') + '|' + idx;
+  var h = 0;
+  for(var i = 0; i < key.length; i++){ h = ((h << 5) - h + key.charCodeAt(i)) | 0; }
+  return 'leg_' + (h >>> 0).toString(36);
+}
+
+function _fieldMerge(cloud, local){
+  const merged = Object.assign({}, cloud);
+  const dirty = local._dirty_fields || [];
+  const lt = local._field_ts || {};
+  const ct = cloud._field_ts || {};
+  const mt = Object.assign({}, ct);
+  dirty.forEach(function(f){
+    // Element-level merge for arrays of objects with id (e.g. entries)
+    if(f === 'entries' && Array.isArray(merged[f]) && Array.isArray(local[f])){
+      const byId = {};
+      (merged[f] || []).forEach(function(e, idx){
+        if(!e) return;
+        if(!e.id) e.id = _legacyEntryId(e, idx);
+        byId[e.id] = e;
+      });
+      (local[f] || []).forEach(function(e, idx){
+        if(!e) return;
+        if(!e.id) e.id = _legacyEntryId(e, idx);
+        var existing = byId[e.id];
+        if(!existing || (e._ts || 0) >= (existing._ts || 0)) byId[e.id] = e;
+      });
+      merged[f] = Object.values(byId);
+      mt[f] = Math.max(lt[f] || 0, ct[f] || 0);
+    } else if((lt[f] || 0) >= (ct[f] || 0)){
+      merged[f] = local[f];
+      mt[f] = lt[f] || 0;
+    }
+  });
+  merged._field_ts = mt;
+  return merged;
+}
+
+// ---- Sheets API Sync ----
+const SheetsSync = {
+  SCHEMA: _DERIVED.SCHEMA,
+  JSON_FIELDS: _DERIVED.JSON_FIELDS,
+  NUMERIC: _DERIVED.NUMERIC,
+  BOOLEAN: _DERIVED.BOOLEAN,
+  NULLABLE: _DERIVED.NULLABLE,
+  BASE: 'https://sheets.googleapis.com/v4/spreadsheets',
+
+  get id() { return localStorage.getItem('monitor_sheets_id'); },
+  set id(v) {
+    if (v) { localStorage.setItem('monitor_sheets_id', v); this._idbStore('monitor_sheets_id', v); }
+    else { localStorage.removeItem('monitor_sheets_id'); this._idbDelete('monitor_sheets_id'); }
+  },
+
+  _idbOpen() {
+    return new Promise(function(resolve, reject) {
+      try {
+        var req = indexedDB.open('ppt_meta', 1);
+        req.onupgradeneeded = function(e) { e.target.result.createObjectStore('kv'); };
+        req.onsuccess = function(e) { resolve(e.target.result); };
+        req.onerror = function() { console.warn('[PPT] IndexedDB open failed — sheet-ID backup disabled, using localStorage only'); reject(); };
+        req.onblocked = function() { console.warn('[PPT] IndexedDB open blocked — another tab holds an older DB version open'); };
+      } catch(e) { console.warn('[PPT] IndexedDB unavailable:', e && e.message); reject(); }
+    });
+  },
+  _idbStore(key, val) {
+    this._idbOpen().then(function(db) {
+      db.transaction('kv', 'readwrite').objectStore('kv').put(val, key);
+    }).catch(function(){});
+  },
+  _idbDelete(key) {
+    this._idbOpen().then(function(db) {
+      db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
+    }).catch(function(){});
+  },
+  _idbGet(key) {
+    return this._idbOpen().then(function(db) {
+      return new Promise(function(resolve) {
+        var req = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+        req.onsuccess = function() { resolve(req.result || null); };
+        req.onerror = function() { resolve(null); };
+      });
+    }).catch(function(){ return null; });
+  },
+
+  _bindSource: null,
+
+  _col: function(n) { let s=''; while(n>0){ n--; s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26); } return s; },
+
+  _ensuring: null,
+  async ensure() {
+    if (this._ensuring) return this._ensuring;
+    this._ensuring = this._doEnsure();
+    try { return await this._ensuring; } finally { this._ensuring = null; }
+  },
+
+  async _doEnsure() {
+    // 0. Restore sheet ID from IndexedDB if localStorage was cleared (Safari ITP)
+    if (!this.id) {
+      try {
+        var idbId = await this._idbGet('monitor_sheets_id');
+        if (idbId) {
+          console.warn('[PPT] Restored sheet ID from IndexedDB:', idbId.slice(0, 8) + '…');
+          localStorage.setItem('monitor_sheets_id', idbId);
+          this._bindSource = 'idb-restore';
+        }
+      } catch(e) {}
+    }
+    // 1. If we have a cached ID, verify it still exists and is not trashed
+    console.warn('[PPT] _doEnsure: cached sheet ID =', this.id || '(none)', ', email =', GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '(none)');
+    if (this.id) {
+      try {
+        const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '?fields=spreadsheetId,properties/title');
+        if (r.ok) {
+          // Check if sheet is trashed (Sheets API still serves trashed files by ID)
+          try {
+            var driveCheck = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files/' + this.id + '?fields=trashed');
+            if (driveCheck.ok) {
+              var driveData = await driveCheck.json();
+              if (driveData.trashed) {
+                console.warn('[PPT] Cached sheet is trashed — clearing and searching Drive');
+                this.id = null;
+              }
+            }
+          } catch(e3) {}
+          if (this.id) {
+            // Auto-rename old sheets to include user email for identification
+            try {
+              var rData = await r.json();
+              var curTitle = rData.properties && rData.properties.title || '';
+              var em = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+              if (em && curTitle && curTitle.indexOf(em) === -1) {
+                GoogleAuth.authFetch(this.BASE + '/' + this.id + ':batchUpdate', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ requests: [{ updateSpreadsheetProperties: { properties: { title: 'PPT Monitor Data — ' + em }, fields: 'title' } }] })
+                }).then(function(rr){ if(!rr.ok) console.warn('Sheet rename failed', rr.status); }).catch(function(){});
+              }
+            } catch(e2) {}
+            this._tagSheet(this.id);
+            if (!this._bindSource) this._bindSource = 'cache';
+            return this.id;
+          }
+        }
+        // Only clear the ID on a definitive 404 (sheet truly gone).
+        // 403/network errors may be transient (Safari ITP re-consent, token race).
+        if (r.status === 404) this.id = null;
+        else if (this.id) return this.id; // keep cached ID, retry next sync
+      } catch(e) {
+        // Network error — don't nuke the ID; surface to caller
+        return this.id;
+      }
+    }
+    // 2. No cached ID — search Drive, then verify each candidate has actual data
+    var email = GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '';
+    var candidates = [];
+    // 2a. Primary search: by app-specific tag (most reliable)
+    try {
+      var q1 = encodeURIComponent("appProperties has { key='ppt_monitor' and value='v1' } and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      var search1 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q1 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=5');
+      if (search1.ok) {
+        var s1Data = await search1.json();
+        if (s1Data.files) s1Data.files.forEach(function(f){ candidates.push(f); });
+      }
+    } catch(e) {}
+    // 2b. Fallback search: by filename (for sheets created before tagging)
+    try {
+      var q2 = encodeURIComponent("name contains 'PPT Monitor Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      var search2 = await GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files?q=' + q2 + '&fields=files(id,name)&orderBy=modifiedTime desc&pageSize=10');
+      if (search2.ok) {
+        var s2Data = await search2.json();
+        if (s2Data.files) {
+          var seen = {};
+          candidates.forEach(function(f){ seen[f.id] = true; });
+          s2Data.files.forEach(function(f){ if (!seen[f.id]) candidates.push(f); });
+        }
+      }
+    } catch(e) {}
+    if (candidates.length) {
+      console.warn('[PPT] Drive search found', candidates.length, 'candidate(s):', candidates.map(function(f){ return f.name + ' (' + f.id.slice(0,8) + '…)'; }));
+      // Sort: email-matched sheets first, then by original order (modifiedTime desc)
+      if (email) {
+        candidates.sort(function(a, b) {
+          var aMatch = a.name.indexOf(email) !== -1 ? 0 : 1;
+          var bMatch = b.name.indexOf(email) !== -1 ? 0 : 1;
+          return aMatch - bMatch;
+        });
+      }
+      // Verify each candidate: schema header must start with 'submission_id', pick richest
+      var bestCandidate = null;
+      var bestRows = 0;
+      var validEmpty = null;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        try {
+          var testR = await GoogleAuth.authFetch(this.BASE + '/' + candidates[ci].id + '/values/daily!A1:A200');
+          if (testR.ok) {
+            var testData = await testR.json();
+            var rows = testData.values || [];
+            if (rows.length >= 1 && rows[0][0] === 'submission_id') {
+              var dataRows = rows.length - 1;
+              console.warn('[PPT] ✓ Sheet verified:', candidates[ci].name, '→', dataRows, 'data rows');
+              if (dataRows > bestRows) {
+                bestCandidate = candidates[ci];
+                bestRows = dataRows;
+              }
+              if (!validEmpty && dataRows === 0) validEmpty = candidates[ci];
+            } else {
+              console.warn('[PPT] ✗ Sheet has wrong schema:', candidates[ci].name, '→', candidates[ci].id);
+            }
+          }
+        } catch(e) { console.warn('[PPT] Could not verify sheet', candidates[ci].id, e); }
+      }
+      if (bestCandidate) {
+        this.id = bestCandidate.id;
+        this._tagSheet(this.id);
+        this._bindSource = 'discovery (' + candidates.length + ' candidates, ' + bestRows + ' rows)';
+        return this.id;
+      }
+      if (validEmpty) {
+        this.id = validEmpty.id;
+        this._tagSheet(this.id);
+        this._bindSource = 'discovery (empty, ' + candidates.length + ' candidates)';
+        return this.id;
+      }
+      // No valid PPT sheets among candidates — warn and fall through to create new
+      console.warn('[PPT] ⚠ Found', candidates.length, 'candidate(s) but none had valid PPT schema');
+    }
+    // 3. Nothing found — create a new spreadsheet titled with user email
+    var sheetTitle = 'PPT Monitor Data' + (email ? ' — ' + email : '');
+    const body = {
+      properties: { title: sheetTitle },
+      sheets: ['daily','assess','meds'].map(function(name) {
+        return {
+          properties: { title: name },
+          data: [{ startRow:0, startColumn:0, rowData:[{
+            values: SheetsSync.SCHEMA[name].map(function(h) { return { userEnteredValue: { stringValue: h } }; })
+          }] }]
+        };
+      })
+    };
+    const r2 = await GoogleAuth.authFetch(this.BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r2.ok) {
+      let errMsg = 'Create spreadsheet failed: ' + r2.status;
+      try { const errBody = await r2.json(); errMsg += ' — ' + (errBody.error && errBody.error.message || JSON.stringify(errBody.error || errBody)); } catch(e2) {}
+      throw new Error(errMsg);
+    }
+    const data = await r2.json();
+    this.id = data.spreadsheetId;
+    this._tagSheet(this.id);
+    this._bindSource = 'created';
+    return this.id;
+  },
+
+  _tagSheet(fileId) {
+    GoogleAuth.authFetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appProperties: { ppt_monitor: 'v1' } })
+    }).then(function(r){ if(r && !r.ok) console.warn('[PPT] Sheet tagging failed (' + r.status + ') — future discovery may fall back to filename match'); })
+      .catch(function(e){ console.warn('[PPT] Sheet tagging request errored — future discovery may fall back to filename match', e && e.message); });
+  },
+
+  async read(sheet) {
+    if (!this.id) return [];
+    const schema = this.SCHEMA[sheet];
+    // Map by HEADER NAME, not column position. Older sheets store columns in a layout
+    // that predates later schema additions (e.g. valence_log inserted after valence);
+    // positional reads then shift every field after the insertion point by one. Reading
+    // by header name realigns those sheets and is identical for correctly-ordered ones.
+    const r = await GoogleAuth.authFetch(this.BASE + '/' + this.id + '/values/' + sheet + '!A:' + this._col(Math.max(schema.length, 26)));
+    if (!r.ok) return [];
+    const data = await r.json();
+    const rows = data.values || [];
+    if (rows.length < 2) return [];
+    const header = rows[0] || [];
+    const colIndex = {};
+    header.forEach(function(name, i) { if (colIndex[name] === undefined) colIndex[name] = i; });
+    const jf = this.JSON_FIELDS[sheet] || [];
+    const self = this;
+    return rows.slice(1).map(function(row) {
+      const obj = {};
+      schema.forEach(function(f) {
+        const ci = colIndex[f];
+        let v = (ci !== undefined && ci < row.length) ? row[ci] : '';
+        if (jf.indexOf(f) >= 0 && typeof v === 'string' && v) { try { v = JSON.parse(v); } catch(e){} }
+        else if (self.BOOLEAN.indexOf(f) >= 0) { v = v === 'true'; }
+        else if (self.NUMERIC.indexOf(f) >= 0) {
+          if (v === '' || v === 'null') v = self.NULLABLE.indexOf(f) >= 0 ? null : 0;
+          else { const n = Number(v); v = isNaN(n) ? v : n; }
+        }
+        else if (v === 'null') { v = self.NULLABLE.indexOf(f) >= 0 ? null : ''; }
+        if (f === 'entry_date') v = Store._normalizeDate(v);
+        obj[f] = v;
+      });
+      return obj;
+    });
+  },
+
+  async write(sheet, records) {
+    const sid = await this.ensure();
+    const schema = this.SCHEMA[sheet];
+    const jf = this.JSON_FIELDS[sheet] || [];
+    const rows = [schema];
+    records.forEach(function(rec) {
+      rows.push(schema.map(function(f) {
+        const v = rec[f];
+        if (v === undefined || v === null) return '';
+        if (jf.indexOf(f) >= 0) return JSON.stringify(v);
+        return String(v);
+      }));
+    });
+    // Write data first — if this fails, existing data is preserved
+    const range = sheet + '!A1:' + this._col(schema.length) + rows.length;
+    const r = await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + range + '?valueInputOption=RAW',
+      { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ values: rows }) });
+    if (!r.ok) {
+      let errMsg = 'Write failed: ' + r.status;
+      try { const errBody = await r.json(); errMsg += ' — ' + (errBody.error && errBody.error.message || JSON.stringify(errBody.error || errBody)); } catch(e2) {}
+      throw new Error(errMsg);
+    }
+    // Clear trailing rows beyond the written range (stale data from previous larger writes)
+    var tailStart = rows.length + 1;
+    var tailRange = sheet + '!A' + tailStart + ':' + this._col(schema.length) + (tailStart + 500);
+    try {
+      await GoogleAuth.authFetch(this.BASE + '/' + sid + '/values/' + tailRange + ':clear',
+        { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    } catch(e) { /* non-fatal: stale trailing rows remain but no data loss */ }
   }
 };
 
 function syncLabel(key, vars){
   const L = {
     synced: { en: '[ Synced ]', zh: '[ 已同步 ]' },
+    synced_empty: { en: '[ No data found ]', zh: '[ 未找到資料 ]' },
     syncing: { en: '[ Syncing: {n} pending ]', zh: '[ 同步中：{n} 待傳 ]' },
-    offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' }
+    offline: { en: '[ Offline: {n} pending ]', zh: '[ 離線：{n} 待傳 ]' },
+    local: { en: '[ Local only ]', zh: '[ 僅本機 ]' },
+    error: { en: '[ Sync error ]', zh: '[ 同步錯誤 ]' },
+    hydrating: { en: '[ Loading… ]', zh: '[ 載入中… ]' },
+    reauth: { en: '[ Sign in again ]', zh: '[ 請重新登入 ]' }
   };
   let s = (L[key] && (L[key][currentLang] || L[key].en)) || key;
   if(vars) Object.keys(vars).forEach(k=>{ s = s.replace(`{${k}}`, vars[k]); });
@@ -533,10 +1455,33 @@ function syncLabel(key, vars){
 function updateSyncUI(){
   const el = $('#syncIndicator');
   if(!el) return;
+  if(_hydrating){
+    el.textContent = syncLabel('hydrating');
+    el.style.color = 'var(--pos)';
+    return;
+  }
   const n = Store.countDirty();
-  if(n === 0){
-    el.textContent = syncLabel('synced');
+  const isGoogle = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const hasBackend = isGoogle || Store.endpoint;
+  if(!hasBackend){
+    el.textContent = syncLabel('local');
     el.style.color = 'var(--mid)';
+  } else if(_authExpired){
+    el.textContent = syncLabel('reauth');
+    el.style.color = 'var(--neg)';
+  } else if(_syncError){
+    el.textContent = syncLabel('error');
+    el.style.color = 'var(--neg)';
+  } else if(n === 0){
+    const d = Store._all();
+    const total = d.daily.length + d.assess.length + d.meds.length;
+    if(total === 0 && isGoogle){
+      el.textContent = syncLabel('synced_empty');
+      el.style.color = 'var(--neg)';
+    } else {
+      el.textContent = syncLabel('synced');
+      el.style.color = 'var(--mid)';
+    }
   } else if(!navigator.onLine){
     el.textContent = syncLabel('offline', { n });
     el.style.color = 'var(--neg)';
@@ -544,13 +1489,60 @@ function updateSyncUI(){
     el.textContent = syncLabel('syncing', { n });
     el.style.color = 'var(--pos)';
   }
+  // Append sync pathway suffix
+  if(hasBackend && !_authExpired){
+    const via = isGoogle ? ' · Google' : (currentLang === 'zh' ? ' · 端點' : ' · Endpoint');
+    el.textContent = el.textContent.replace(/\s*\]$/, via + ' ]');
+  }
+}
+
+function updateAuthUI(){
+  const isSignedIn = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const brandBtn = $('#brandBtn');
+  const sep = $('#authSep');
+  const signInBtn = $('#googleSignIn');
+  const userArea = $('#googleUser');
+  if(isSignedIn){
+    if(brandBtn) brandBtn.style.display = 'none';
+    if(sep) sep.style.display = 'none';
+    if(signInBtn) signInBtn.style.display = 'none';
+    if(userArea){
+      userArea.style.display = '';
+      $('#googleEmail').textContent = GoogleAuth.userEmail || '...';
+    }
+    if(typeof _updatePersistBtn === 'function') _updatePersistBtn();
+  } else {
+    if(brandBtn){
+      brandBtn.style.display = '';
+      if(Store.endpoint){
+        brandBtn.textContent = t('auth_disconnect');
+        brandBtn.style.color = '#2a7d4f';
+        brandBtn.style.textDecorationColor = '#2a7d4f';
+      } else {
+        brandBtn.textContent = t('auth_endpoint');
+        brandBtn.style.color = 'var(--ink-soft)';
+        brandBtn.style.textDecorationColor = 'var(--line)';
+      }
+    }
+    if(sep) sep.style.display = Store.endpoint ? 'none' : '';
+    if(signInBtn){
+      signInBtn.style.display = Store.endpoint ? 'none' : '';
+      const savedEmail = localStorage.getItem('monitor_auth_email');
+      if(savedEmail && localStorage.getItem('monitor_auth_mode') === 'google'){
+        signInBtn.textContent = savedEmail;
+      } else {
+        signInBtn.textContent = t('auth_signin');
+      }
+    }
+    if(userArea) userArea.style.display = 'none';
+  }
 }
 
 function guardSubmitBtn(btn, fn){
   if(!btn || btn.disabled) return;
   btn.disabled = true;
-  fn();
-  setTimeout(()=>{ btn.disabled = false; }, 500);
+  try { fn(); }
+  finally { setTimeout(()=>{ btn.disabled = false; }, 500); }
 }
 
 let currentLang = 'en';
@@ -560,6 +1552,10 @@ const I18N = {
   daily_head:{en:'Daily Entry',zh:'每日紀錄'}, daily_sub:{en:'mood · body · biological fact · note',zh:'情緒 · 身體 · 生理事實 · 備註'},
   entry_date:{en:'Entry date',zh:'紀錄日期'}, mood:{en:'Mood',zh:'情緒'}, mood_hint:{en:'how does this moment feel',zh:'此刻感受如何'},
   val_very_unpleasant:{en:'very unpleasant',zh:'非常不愉快'}, val_neutral:{en:'neutral',zh:'中性'}, val_very_pleasant:{en:'very pleasant',zh:'非常愉快'},
+  mood_log_head:{en:'Earlier readings',zh:'先前記錄'}, mood_log_at:{en:'at',zh:'於'},
+  will_log_at:{en:'records at',zh:'記錄於'}, refresh_time:{en:'Set to current time',zh:'設為目前時間'},
+  reading_time_opt:{en:'reading time (optional)',zh:'記錄時間（選填）'},
+  log_mood_btn:{en:'Log Mood',zh:'記錄情緒'},
   body_sensations:{en:'Body sensations',zh:'身體感受'}, body_hint:{en:'select any',zh:'可複選'},
   other_describe:{en:'other — describe',zh:'其他 — 描述'}, tension_where:{en:'tension — where?',zh:'緊繃 — 哪裡？'},
   bio_fact:{en:'Biological fact',zh:'生理事實'}, bio_hint:{en:'ate / slept / pain / etc.',zh:'飲食 / 睡眠 / 疼痛等'},
@@ -578,9 +1574,18 @@ const I18N = {
   meds_head:{en:'Medication',zh:'用藥'}, meds_sub:{en:'stream ledger · log each intake',zh:'流水帳 · 逐筆記錄'},
   log_date:{en:'Log date',zh:'紀錄日期'}, quick_entry:{en:'Quick entry',zh:'快速輸入'}, medication:{en:'Medication',zh:'藥物'},
   log_intake:{en:'Log intake',zh:'記錄服用'}, todays_ledger:{en:"Today's ledger",zh:'今日流水'},
+  manage_templates:{en:'Manage templates',zh:'管理模板'}, tpl_toggle:{en:'edit',zh:'編輯'}, tpl_hide:{en:'hide',zh:'隱藏'},
+  tpl_name:{en:'Drug name',zh:'藥物名稱'}, tpl_fields:{en:'Fields to track',zh:'追蹤欄位'},
+  tpl_mg:{en:'mg per tablet (optional)',zh:'每錠毫克（選填）'}, tpl_multi:{en:'Multiple per day?',zh:'每日可多次？'},
+  tpl_add:{en:'Add template',zh:'新增模板'}, tpl_reset:{en:'Reset to defaults',zh:'恢復預設'},
+  tpl_added:{en:'Template added',zh:'已新增模板'}, tpl_reset_done:{en:'Templates reset to defaults',zh:'模板已恢復預設'},
+  tpl_name_required:{en:'Enter a drug name',zh:'請輸入藥物名稱'}, tpl_fields_required:{en:'Select at least one field',zh:'請至少選擇一個欄位'},
   log_head:{en:'Log',zh:'紀錄'}, log_sub:{en:'recent entries · newest first',zh:'近期紀錄 · 新到舊'},
-  export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'},
-  field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_with_food:{en:'With food',zh:'與食物同服'},
+  export_json:{en:'Export JSON',zh:'匯出 JSON'}, export_csv:{en:'Export CSV',zh:'匯出 CSV'}, import_json:{en:'Import JSON',zh:'匯入 JSON'},
+  toast_import_done:{en:'{n} record(s) imported',zh:'已匯入 {n} 筆紀錄'}, toast_import_skipped:{en:'{n} skipped',zh:'{n} 筆略過'},
+  toast_import_invalid:{en:'Invalid file — expected JSON export',zh:'無效檔案 — 需為 JSON 匯出格式'},
+  toast_import_version:{en:'Export version too new — update the app first',zh:'匯出版本過新 — 請先更新應用'},
+  field_time:{en:'Time',zh:'時間'}, field_tablets:{en:'Tablets',zh:'錠數'}, field_withFood:{en:'With food',zh:'與食物同服'},
   field_effect:{en:'Follow-up body effect',zh:'後續身體反應'}, field_substance:{en:'Substance',zh:'物質'},
   field_amount:{en:'Amount (rough)',zh:'劑量（概估）'}, field_notes:{en:'Notes',zh:'備註'},
   field_taken_at:{en:'Taken at',zh:'服用時間'},
@@ -595,6 +1600,8 @@ const I18N = {
   toast_assess_saved:{en:'Assessment saved',zh:'評估已儲存'}, toast_assess_updated:{en:'Assessment updated',zh:'評估已更新'},
   toast_intake_logged:{en:'Intake logged',zh:'已記錄服用'}, toast_editing:{en:'Editing',zh:'編輯中'},
   toast_invalid_dose:{en:'Invalid dose (0–10 tablets)',zh:'無效劑量（0–10 錠）'},
+  toast_sync_error:{en:'Sync error — will retry',zh:'同步錯誤 — 將重試'},
+  toast_scope_missing:{en:'Drive permission not granted — please sign in again and allow file access',zh:'未授予雲端硬碟權限 — 請重新登入並允許檔案存取'},
   daily_sub_onfile:{en:'entry on file for {date} — save will update',zh:'{date} 已有紀錄 — 儲存將更新'},
   assess_sub_onfile:{en:'assessment on file for {date} — save will update',zh:'{date} 已有評估 — 儲存將更新'},
   meds_sub_onfile:{en:'{n} intake(s) on file for {date}',zh:'{date} 已有 {n} 筆服用紀錄'},
@@ -604,20 +1611,29 @@ const I18N = {
   log_backfilled:{en:'backfilled',zh:'補登'}, log_valence:{en:'valence',zh:'效價'},
   log_med_entries:{en:'med entries',zh:'用藥筆數'}, log_edit_daily:{en:'edit daily',zh:'編輯每日'}, log_edit_assess:{en:'edit assessment',zh:'編輯評估'},
   log_edit_meds:{en:'edit meds',zh:'編輯用藥'}, log_empty:{en:'No entries yet.',zh:'尚無紀錄。'},
+  log_show_more:{en:'Show more ({n} remaining)',zh:'顯示更多（剩餘 {n} 筆）'},
   due_none:{en:'No assessment on record yet — the first one establishes your baseline.',zh:'尚無評估紀錄 — 第一次將建立基準。'},
   due_reached:{en:'Due — last completed {date}. Biweekly target reached.',zh:'到期 — 上次完成 {date}。已達雙週目標。'},
   due_countdown:{en:'Last assessment {days} day(s) ago ({date}). Next due in {left} day(s).',zh:'上次評估 {days} 天前（{date}）。{left} 天後到期。'},
   sev_incomplete:{en:'incomplete',zh:'未完成'},
   food_label:{en:'food',zh:'食物'},
   footnote:{en:'Data stored locally and synced to your private Google Sheet.',zh:'資料儲存於本機，並同步至您的私人 Google 試算表。'},
+  confirm_disconnect_endpoint:{en:'Disconnect from endpoint and clear local data?',zh:'中斷端點連線並清除本機資料？'},
+  toast_disconnected:{en:'Disconnected',zh:'已中斷連線'},
+  auth_endpoint:{en:'Endpoint URL',zh:'端點 URL'},
+  auth_disconnect:{en:'Disconnect endpoint',zh:'中斷端點'},
+  auth_or:{en:'or',zh:'或'},
+  auth_signin:{en:'Sign in with Google',zh:'使用 Google 登入'},
+  auth_signout:{en:'Sign out',zh:'登出'},
   sleep_head:{en:'Sleep',zh:'睡眠'}, sleep_hint:{en:'previous night — all optional',zh:'前一夜 — 皆為選填'},
   sleep_bedtime:{en:'Bedtime',zh:'就寢時間'}, sleep_onset:{en:'Sleep Onset (rough)',zh:'入睡時間（概估）'},
   sleep_wakes:{en:'Wake Count',zh:'醒來次數'}, sleep_wake_time:{en:'Wake Time',zh:'早晨醒來'},
   sleep_quality_label:{en:'Sleep Quality (optional)',zh:'品質（選填）'},
-  sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'OK',zh:'可以'}, sq_good:{en:'Good',zh:'好'},
+  sq_4:{en:'Good',zh:'好'}, sq_3:{en:'Fair',zh:'尚可'}, sq_2:{en:'Poor',zh:'差'}, sq_1:{en:'Awful',zh:'很差'},
+  sq_poor:{en:'Poor',zh:'差'}, sq_fair:{en:'Fair',zh:'尚可'}, sq_ok:{en:'Fair',zh:'尚可'}, sq_good:{en:'Good',zh:'好'},
   sleep_zolon_label:{en:'Zolon (prev night):',zh:'Zolon（前夜）：'},
   sleep_zolon_none:{en:'—',zh:'—'},
-  sleep_zolon_caution:{en:'Assumes doses before 4:00 AM belong to the previous night.',zh:'假設凌晨 4:00 前的劑量屬於前一夜。'},
+  sleep_zolon_caution:{en:'Assumes doses before 6:00 AM belong to the previous night.',zh:'假設凌晨 6:00 前的劑量屬於前一夜。'},
   'Tension':{en:'Tension',zh:'緊繃'}, 'Heaviness':{en:'Heaviness',zh:'沉重'}, 'Fatigue':{en:'Fatigue',zh:'疲勞'},
   'Racing heart':{en:'Racing heart',zh:'心悸'}, 'Stomach discomfort':{en:'Stomach discomfort',zh:'胃部不適'},
   'Shallow breathing':{en:'Shallow breathing',zh:'呼吸淺'}, 'Restlessness':{en:'Restlessness',zh:'坐立不安'},
@@ -677,13 +1693,24 @@ const OPTS_ZH = ["完全沒有", "幾天", "一半以上的天數", "幾乎每�
 
 const BODY_SENSATIONS = ['Tension','Heaviness','Fatigue','Racing heart','Stomach discomfort','Shallow breathing','Restlessness','Numbness','Neutral','Other'];
 
-const MED_TEMPLATES = [
-  { id:'wellbutrin', name:'Wellbutrin XL 300mg', pattern:'daily', fields:['time','withFood'], multi:false },
-  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', pattern:'daily-night', fields:['tablets','taken_at'], multi:false, mgPerTab:7.5 },
-  { id:'ritalin',    name:'Ritalin 10mg', pattern:'prn-frequent', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
-  { id:'recreational', name:'Recreational / other', pattern:'rare', fields:['substance','time','amount','notes'], multi:true,
+const _DEFAULT_MED_TEMPLATES = [
+  { id:'wellbutrin', name:'Wellbutrin XL 300mg', fields:['time','withFood'], multi:false },
+  { id:'zolon',      name:'Zolon 7.5mg (zopiclone)', fields:['tablets','taken_at'], multi:false, mgPerTab:7.5 },
+  { id:'ritalin',    name:'Ritalin 10mg', fields:['time','tablets','withFood','effect'], multi:true, mgPerTab:10 },
+  { id:'recreational', name:'Recreational / other', fields:['substance','time','amount','notes'], multi:true,
     options:['THC (vape)','THC (flower)','THC (edible)','Alcohol','MDMA / ecstasy','Ketamine','Other'] }
 ];
+const _MED_TPL_KEY = 'monitor_med_templates';
+const _ALL_MED_FIELDS = ['time','taken_at','tablets','withFood','effect','substance','amount','notes'];
+
+function getMedTemplates(){
+  try {
+    const raw = localStorage.getItem(_MED_TPL_KEY);
+    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr; }
+  } catch(e){}
+  return _DEFAULT_MED_TEMPLATES;
+}
+function saveMedTemplates(arr){ localStorage.setItem(_MED_TPL_KEY, JSON.stringify(arr)); }
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -708,14 +1735,19 @@ function todayISO(){
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function nowStamp(){ return new Date().toISOString(); }
+function nowStamp(){ return new Date().toISOString() + '-' + Math.random().toString(36).slice(2,6); }
 function nowLocalDatetime(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
-function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
+let _toastTimer = null;
+function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); if(_toastTimer) clearTimeout(_toastTimer); _toastTimer = setTimeout(()=>{ el.classList.remove('show'); _toastTimer = null; },1900); }
 function fmtDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]; return `${d} ${mo} ${y}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// Normalize legacy sleep quality strings to numeric values (good=4, fair=3, poor=2, awful=1)
+const _SQ_NORM = { 'good':'4', 'ok':'3', 'fair':'3', 'poor':'2' };
+function normSQ(v){ return _SQ_NORM[v] || v; }
 
 function extractTime(val) {
   if (!val) return '';
@@ -771,14 +1803,14 @@ function resolveZolonDatetime(entry, recordEntryDate){
 function getZolonForNight(dailyDate){
   if(!dailyDate) return null;
 
-  // Window: 18:00 on (D-1) through 04:00 on D (local time)
+  // Window: 18:00 on (D-1) through 06:00 on D (local time)
   const dObj = new Date(dailyDate + 'T12:00:00');
   const dMinus1 = new Date(dObj); dMinus1.setDate(dMinus1.getDate() - 1);
   const fmtD = s => `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
   
   // Using the safe parser to guarantee mathematical comparisons work across devices
   const windowStart = parseLocalDatetime(fmtD(dMinus1) + 'T18:00:00').getTime();
-  const windowEnd   = parseLocalDatetime(dailyDate + 'T04:00:00').getTime();
+  const windowEnd   = parseLocalDatetime(dailyDate + 'T06:00:00').getTime();
 
   // Candidate meds record dates: D-2, D-1, D
   const dMinus2 = new Date(dObj); dMinus2.setDate(dMinus2.getDate() - 2);
@@ -789,7 +1821,7 @@ function getZolonForNight(dailyDate){
 
   candidateDates.forEach(recDate => {
     const rec = Store.getByDate('meds', recDate);
-    if(!rec || !rec.entries) return;
+    if(!rec || !Array.isArray(rec.entries)) return;
     rec.entries.forEach(entry => {
       if(entry.medication !== 'zolon') return;
       const dt = resolveZolonDatetime(entry, recDate);
@@ -797,7 +1829,7 @@ function getZolonForNight(dailyDate){
       
       const ts = dt.getTime();
       
-      // If the parsed date safely sits within the 18:00 -> 04:00 window, surface it.
+      // If the parsed date safely sits within the 18:00 -> 06:00 window, surface it.
       if(ts >= windowStart && ts < windowEnd && ts > bestTime){
         best = { entry, datetime: dt };
         bestTime = ts;
@@ -835,6 +1867,8 @@ function renderI18n(){
   $$('[data-i18n-placeholder]').forEach(el=>{
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
+  $$('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
+  { const _vtl = $('#d_valence_time_label'); if(_vtl) _vtl.textContent = _isBackfillDate() ? t('reading_time_opt') : t('will_log_at'); }
   $$('option[data-i18n-opt]').forEach(opt=>{ opt.textContent = t(opt.dataset.i18nOpt); });
   $$('#d_body .chip').forEach(c=>{ c.textContent = t(c.dataset.val); });
   rebuildAssessItems();
@@ -847,6 +1881,7 @@ function renderI18n(){
   updateMedsSub();
   refreshDueBanner();
   renderMedLedger();
+  if($('#tpl_editor').style.display !== 'none') renderTplEditor();
   updateZolonDisplay();
   if($('#seg-log').classList.contains('active')) renderLog();
 }
@@ -861,7 +1896,7 @@ function switchSeg(seg){
   $$('nav.tabs button').forEach(x=>x.classList.toggle('active', x.dataset.seg===seg));
   $$('.seg').forEach(x=>x.classList.remove('active'));
   $('#seg-'+seg).classList.add('active');
-  if(seg==='log') renderLog();
+  if(seg==='log'){ _logLimit = _LOG_PAGE; renderLog(); }
   if(seg==='assess') refreshDueBanner();
   if(seg==='meds') renderMedLedger();
 }
@@ -885,6 +1920,114 @@ function updateValence(){
   r.style.color = valColor(v);
 }
 valSlider.addEventListener('input', updateValence);
+// Touching the slider implies intent to log → auto-unlock (only on the off→on transition,
+// so dragging doesn't keep resetting the time field).
+valSlider.addEventListener('input', function(){ const b=$('#d_mood_toggle'); if(b && !b.classList.contains('on')) setMoodToggle(true); });
+$('#d_mood_toggle').addEventListener('click', function(){ setMoodToggle(!this.classList.contains('on')); });
+
+// Coerce a possibly-legacy value into an array. Cloud rows can hold array fields
+// (body_sensations, etc.) as a plain string when an old non-JSON value fails to parse;
+// without this, .map/.forEach/.filter throw and can blank an entire view.
+function _asArr(v){
+  if(Array.isArray(v)) return v;
+  if(typeof v === 'string' && v.trim()) return v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  return [];
+}
+
+// True if v is (or is a JSON string of) a _field_ts-style timestamp map: an object whose
+// values are all numbers and whose keys are field names. Used to detect the column-shift
+// where the old _field_ts column lands in `note`.
+function _isTsMap(v){
+  let o = v;
+  if(typeof v === 'string'){ const s = v.trim(); if(s.charAt(0) !== '{') return false; try { o = JSON.parse(s); } catch(e){ return false; } }
+  if(!o || typeof o !== 'object' || Array.isArray(o)) return false;
+  const keys = Object.keys(o);
+  if(!keys.length || !keys.every(function(k){ return typeof o[k] === 'number'; })) return false;
+  return keys.indexOf('valence') >= 0 || keys.indexOf('backfilled') >= 0 || keys.indexOf('note') >= 0;
+}
+
+// Detect a daily record whose columns were shifted +1 by the old positional read of a
+// pre-valence_log sheet. Correct records carry a real _field_ts object; shifted ones have
+// the old _field_ts displaced into `note` (a timestamp map, or the literal "" when it was
+// empty) and body_sensations displaced into valence_log (an array of plain strings).
+function _isDailyShifted(d){
+  if(!d) return false;
+  if(d._field_ts && typeof d._field_ts === 'object' && !Array.isArray(d._field_ts)) return false; // already correct
+  if(_isTsMap(d.note)) return true;
+  if(d.note === '""') return true;
+  if(Array.isArray(d.valence_log) && d.valence_log.length && typeof d.valence_log[0] === 'string') return true;
+  return false;
+}
+
+// When a record is shifted, return a CORRECTED COPY with fields un-shifted. Non-destructive:
+// stored data is never mutated; this only fixes what's displayed / loaded into the form.
+// Idempotent (a corrected record fails _isDailyShifted, so it won't be touched again).
+function _repairDailyShift(d){
+  if(!d || !_isDailyShifted(d)) return d;
+  const r = Object.assign({}, d);
+  r._field_ts = (typeof d.note === 'string') ? (function(){ try { return JSON.parse(d.note); } catch(e){ return {}; } })() : d.note;
+  r.note = d.biological_fact;
+  r.biological_fact = d.sleep_quality;
+  r.sleep_quality = d.sleep_wake_time;
+  r.sleep_wake_time = d.sleep_wakes;
+  r.sleep_wakes = d.sleep_onset;
+  r.sleep_onset = d.sleep_bedtime;
+  r.sleep_bedtime = d.body_other;
+  r.body_other = d.body_tension_where;
+  r.body_tension_where = d.body_sensations;
+  r.body_sensations = _asArr(d.valence_log);
+  r.valence_log = [];
+  return r;
+}
+
+function renderValenceLog(log){
+  const el = $('#d_valence_log');
+  if(!el) return;
+  if(!Array.isArray(log) || !log.length){ el.innerHTML = ''; return; }
+  let html = '<div class="vl-head">' + t('mood_log_head') + '</div>';
+  let any = false;
+  log.forEach(function(entry){
+    if(!entry || typeof entry.v !== 'number') return;
+    const v = entry.v;
+    const pct = (v * 100);
+    const word = t(valWord(pct));
+    html += '<div class="vl-entry"><span>' + esc(entry.at) + '</span><span style="color:' + valColor(pct) + '">' + word + ' (' + v.toFixed(2) + ')</span></div>';
+    any = true;
+  });
+  el.innerHTML = any ? html : '';
+}
+
+// Time the next valence reading will be stamped with — an editable snapshot (not a live
+// clock); saveDaily records exactly this value. For TODAY it defaults to now; when
+// BACKFILLING a past date it is left blank (auto-now would be wrong), so the user can
+// optionally pick the time the reading actually belongs to, or leave it empty.
+function currentLogTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function _isBackfillDate(){ const v = $('#d_date') && $('#d_date').value; return !!v && v < todayISO(); }
+function refreshValenceTime(){ const el=$('#d_valence_time'); if(el) el.value = currentLogTime(); } // the ↻ button: set to now
+function _resetValenceTime(){
+  const el=$('#d_valence_time'); if(!el) return;
+  const backfill = _isBackfillDate();
+  el.value = backfill ? '' : currentLogTime();
+  const lab = $('#d_valence_time_label');
+  if(lab) lab.textContent = backfill ? t('reading_time_opt') : t('will_log_at');
+}
+// Mood-logging toggle. Locked (red) = this Save will NOT add a mood reading; unlocked
+// (green) = it will, with whatever value the slider holds (including neutral). The time
+// field is only shown while unlocked. Defaults unlocked on a NEW day (so a full first
+// entry is one tap) and locked when revisiting an existing day (so later edits to
+// sleep/note don't stack phantom readings).
+function setMoodToggle(on){
+  const btn = $('#d_mood_toggle'); if(!btn) return;
+  btn.classList.toggle('on', !!on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const vt = $('.valence-time'); if(vt) vt.style.display = on ? 'flex' : 'none';
+  if(on) _resetValenceTime();
+}
+function _resetMoodToggle(){
+  const date = $('#d_date') && $('#d_date').value;
+  const existing = date && Store.getByDate('daily', date);
+  setMoodToggle(!existing);
+}
 
 const bodyWrap = $('#d_body');
 BODY_SENSATIONS.forEach(s=>{
@@ -930,16 +2073,18 @@ function clearDailyForm(){
   $('#d_sleep_wakes').value=''; $('#d_sleep_wake').value='';
   $('#d_sleep_quality').value='';
   $('#d_bio').value=''; $('#d_note').value='';
+  renderValenceLog(null);
+  _resetMoodToggle();
 }
 function loadDaily(date){
   if(!date) return;
   $('#d_date').value = date;
   clearDailyForm();
-  const rec = Store.getByDate('daily', date);
+  const rec = _repairDailyShift(Store.getByDate('daily', date));
   if(rec){
     valSlider.value = Math.round((rec.valence ?? 0) * 100);
     updateValence();
-    (rec.body_sensations || []).forEach(s=>{
+    _asArr(rec.body_sensations).forEach(s=>{
       const chip = $$(`#d_body .chip`).find(c=>c.dataset.val===s);
       if(chip){
         chip.classList.add('on');
@@ -953,9 +2098,10 @@ function loadDaily(date){
     if(rec.sleep_onset) $('#d_sleep_onset').value = extractTime(rec.sleep_onset);
     if(rec.sleep_wakes !== null && rec.sleep_wakes !== undefined) $('#d_sleep_wakes').value = rec.sleep_wakes;
     if(rec.sleep_wake_time) $('#d_sleep_wake').value = extractTime(rec.sleep_wake_time);
-    if(rec.sleep_quality) $('#d_sleep_quality').value = rec.sleep_quality;
+    if(rec.sleep_quality) $('#d_sleep_quality').value = normSQ(rec.sleep_quality);
     $('#d_bio').value = rec.biological_fact || '';
     $('#d_note').value = rec.note || '';
+    renderValenceLog(rec.valence_log);
   }
   updateDailySub();
   updateZolonDisplay();
@@ -966,12 +2112,28 @@ function saveDaily(){
     const existing = Store.getByDate('daily', $('#d_date').value);
     const rec = collectDaily();
     if(existing) rec.submission_id = existing.submission_id;
+    // Append current reading to valence_log
+    const prevLog = (existing && Array.isArray(existing.valence_log)) ? existing.valence_log : [];
+    if($('#d_mood_toggle').classList.contains('on')){
+      // Mood logging unlocked → append one reading (any value, including neutral).
+      const timeEl = $('#d_valence_time');
+      let timeStr = (timeEl && /^\d{2}:\d{2}$/.test(timeEl.value)) ? timeEl.value : '';
+      // Auto-fill "now" only for today's entries; a blank backfill time stays blank on purpose.
+      if(!timeStr && !rec.backfilled) timeStr = currentLogTime();
+      rec.valence_log = prevLog.concat([{ v: rec.valence, at: timeStr }]);
+    } else {
+      // Locked → don't add a reading; preserve the day's existing mood snapshot + history.
+      rec.valence = existing ? existing.valence : null;
+      rec.valence_log = prevLog;
+    }
     Store.put('daily', rec);
     toast(existing ? t('toast_daily_updated') : t('toast_daily_saved'));
     updateDailySub();
+    renderValenceLog(rec.valence_log);
+    _resetValenceTime();
   });
 }
-function resetDaily(){ clearDailyForm(); $('#d_date').value = todayISO(); updateDailySub(); updateZolonDisplay(); }
+function resetDaily(){ $('#d_date').value = todayISO(); clearDailyForm(); updateDailySub(); updateZolonDisplay(); }
 $('#d_date').addEventListener('change', ()=>loadDaily($('#d_date').value));
 
 function getAssessItemText(itemsEn, itemsZh, i){
@@ -1109,7 +2271,7 @@ function refreshDueBanner(){
     return;
   }
   const last = dates[0];
-  const days = Math.floor((new Date(todayISO()) - new Date(last)) / 86400000);
+  const days = Math.round((new Date(todayISO() + 'T12:00:00') - new Date(last + 'T12:00:00')) / 86400000);
   if(days>=14){
     banner.className='due-banner';
     banner.textContent=t('due_reached',{date:fmtDate(last)});
@@ -1126,9 +2288,11 @@ function fieldHTML(med, f, ridx){
     case 'time': return `<label class="fld"><span class="lab">${t('field_time')}</span><input type="time" id="${id}"></label>`;
     case 'taken_at': return `<label class="fld"><span class="lab">${t('field_taken_at')}</span><input type="datetime-local" id="${id}" value="${nowLocalDatetime()}"></label>`;
     case 'tablets': return `<label class="fld"><span class="lab">${t('field_tablets')}${tabLabel}</span><input type="number" step="0.5" min="0" max="10" id="${id}"></label>`;
-    case 'withFood': return `<label class="fld"><span class="lab">${t('field_with_food')}</span><input type="hidden" id="${id}" value=""><div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('${id}','Yes',this)">${t('yes')}</button><button type="button" class="tyn" onclick="setToggle('${id}','No',this)">${t('no')}</button></div></label>`;
+    case 'withFood': return `<label class="fld"><span class="lab">${t('field_withFood')}</span><input type="hidden" id="${id}" value=""><div class="toggle-yn"><button type="button" class="tyn" onclick="setToggle('${id}','Yes',this)">${t('yes')}</button><button type="button" class="tyn" onclick="setToggle('${id}','No',this)">${t('no')}</button></div></label>`;
     case 'effect': return `<label class="fld"><span class="lab">${t('field_effect')}</span><input type="text" id="${id}" placeholder="${esc(t('effect_ph'))}"></label>`;
-    case 'substance': return `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${(med.options||[]).map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`;
+    case 'substance': return (med.options && med.options.length)
+      ? `<label class="fld"><span class="lab">${t('field_substance')}</span><select id="${id}"><option value="">—</option>${med.options.map(o=>`<option value="${esc(o)}">${esc(t(o))}</option>`).join('')}</select></label>`
+      : `<label class="fld"><span class="lab">${t('field_substance')}</span><input type="text" id="${id}"></label>`;
     case 'amount': return `<label class="fld"><span class="lab">${t('field_amount')}</span><input type="text" id="${id}" placeholder="${esc(t('amount_ph'))}"></label>`;
     case 'notes': return `<label class="fld"><span class="lab">${t('field_notes')}</span><input type="text" id="${id}"></label>`;
     default: return '';
@@ -1138,10 +2302,11 @@ function fieldHTML(med, f, ridx){
 function initMedSelector(){
   const sel = $('#med_selector');
   const cur = sel.value;
-  sel.innerHTML = `<option value="">—</option>` + MED_TEMPLATES.map(m=>
-    `<option value="${m.id}">${esc(t('med_'+m.id))}</option>`
+  const tpls = getMedTemplates();
+  sel.innerHTML = `<option value="">—</option>` + tpls.map(m=>
+    `<option value="${m.id}">${esc(t('med_'+m.id) === 'med_'+m.id ? m.name : t('med_'+m.id))}</option>`
   ).join('');
-  if(cur && MED_TEMPLATES.some(m=>m.id===cur)) sel.value = cur;
+  if(cur && tpls.some(m=>m.id===cur)) sel.value = cur;
 }
 
 function renderMedQuickFields(){
@@ -1149,17 +2314,21 @@ function renderMedQuickFields(){
   const host = $('#med_quick_fields');
   host.innerHTML = '';
   if(!medId) return;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return;
   host.innerHTML = med.fields.map(f=>fieldHTML(med, f, 'quick')).join('');
 }
 
 function clearMedQuickFields(){
   const medId = $('#med_selector').value;
   if(!medId) return;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return;
   med.fields.forEach(f=>{
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
-    if(el) el.value = '';
+    if(!el) return;
+    // Reset taken_at to current datetime so the next entry defaults to "now"
+    el.value = f === 'taken_at' ? nowLocalDatetime() : '';
   });
   $$('#med_quick_fields .tyn.on').forEach(b => b.classList.remove('on'));
 }
@@ -1167,8 +2336,9 @@ function clearMedQuickFields(){
 function collectQuickMedEntry(){
   const medId = $('#med_selector').value;
   if(!medId) return null;
-  const med = MED_TEMPLATES.find(m=>m.id===medId);
-  const obj = { medication: med.id, med_name: med.name };
+  const med = getMedTemplates().find(m=>m.id===medId);
+  if(!med) return null;
+  const obj = { medication: med.id, med_name: med.name, id: Math.random().toString(36).slice(2,8), _ts: Date.now() };
   let hasData = false;
   med.fields.forEach(f=>{
     const el = document.getElementById(`m_${med.id}_quick_${f}`);
@@ -1180,7 +2350,7 @@ function collectQuickMedEntry(){
 
 function getMedsRecord(date, create){
   const existing = Store.getByDate('meds', date);
-  if(existing) return { ...existing, entries: [...existing.entries] };
+  if(existing) return { ...existing, entries: Array.isArray(existing.entries) ? [...existing.entries] : [] };
   if(!create) return null;
   return {
     submission_id: nowStamp(),
@@ -1195,6 +2365,7 @@ function persistMedsRecord(rec){
     Store.deleteBySubmission('meds', rec.submission_id);
     return;
   }
+  // Keep record even if all entries are tombstoned (needed for sync)
   Store.put('meds', rec);
 }
 
@@ -1209,8 +2380,6 @@ function logIntake(){
   }
   guardSubmitBtn($('#btn_log_intake'), ()=>{
     const rec = getMedsRecord(date, true);
-    const existing = Store.getByDate('meds', date);
-    if(existing) rec.submission_id = existing.submission_id;
     rec.entries.push(entry);
     persistMedsRecord(rec);
     clearMedQuickFields();
@@ -1220,18 +2389,20 @@ function logIntake(){
   });
 }
 
-function removeMedEntry(idx){
+function removeMedEntry(entryId){
   const date = $('#m_date').value;
   const rec = getMedsRecord(date, false);
   if(!rec) return;
-  rec.entries.splice(idx, 1);
+  const entry = rec.entries.find(function(e){ return e.id === entryId; });
+  if(entry){ entry._deleted = true; entry._ts = Date.now(); }
   persistMedsRecord(rec);
   renderMedLedger();
   updateMedsSub();
 }
 
 function medLineDisplay(m){
-  const parts = [t('med_'+m.medication) || m.med_name];
+  const medKey = 'med_'+m.medication;
+  const parts = [t(medKey) === medKey ? (m.med_name || m.medication) : t(medKey)];
   if(m.substance) parts.push(t(m.substance) || m.substance);
   if(m.taken_at) parts.push(m.taken_at.replace('T',' '));
   else if(m.time) parts.push(m.time);
@@ -1243,27 +2414,30 @@ function medLineDisplay(m){
   return parts.map(p=>esc(String(p))).join(' · ');
 }
 
+function _activeEntries(arr){ return (Array.isArray(arr) ? arr : []).filter(function(e){ return e && !e._deleted; }); }
+
 function renderMedLedger(){
   const host = $('#med_ledger');
   const date = $('#m_date').value;
   const rec = date ? Store.getByDate('meds', date) : null;
-  const entries = rec && rec.entries ? rec.entries : [];
-  if(!entries.length){
+  const active = _activeEntries(rec && rec.entries);
+  if(!active.length){
     host.innerHTML = `<div class="empty">${esc(t('ledger_empty'))}</div>`;
     return;
   }
-  host.innerHTML = entries.map((e,i)=>`
-    <div class="med-ledger-item">
+  host.innerHTML = active.map(function(e){
+    return `<div class="med-ledger-item">
       <span>${medLineDisplay(e)}</span>
-      <button type="button" class="btn-rm-ledger" onclick="removeMedEntry(${i})" aria-label="remove">×</button>
-    </div>`).join('');
+      <button type="button" class="btn-rm-ledger" data-rm-entry="${esc(String(e.id)).replace(/"/g,'&quot;')}" aria-label="remove">×</button>
+    </div>`;
+  }).join('');
 }
 
 function updateMedsSub(){
   const date = $('#m_date').value;
   const ex = date && Store.getByDate('meds', date);
-  const n = ex && ex.entries ? ex.entries.length : 0;
-  $('#medsSub').textContent = ex ? t('meds_sub_onfile', {date: fmtDate(date), n}) : t('meds_sub');
+  const n = ex ? _activeEntries(ex.entries).length : 0;
+  $('#medsSub').textContent = ex && n ? t('meds_sub_onfile', {date: fmtDate(date), n}) : t('meds_sub');
 }
 
 function loadMeds(date){
@@ -1276,7 +2450,83 @@ function loadMeds(date){
 
 $('#med_selector').addEventListener('change', renderMedQuickFields);
 $('#m_date').addEventListener('change', ()=>loadMeds($('#m_date').value));
+$('#med_ledger').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-rm-entry]');
+  if(btn) removeMedEntry(btn.getAttribute('data-rm-entry'));
+});
 initMedSelector();
+
+// ---- Template editor ----
+$('#btn_toggle_tpl_editor').addEventListener('click', function(){
+  const ed = $('#tpl_editor');
+  const showing = ed.style.display !== 'none';
+  ed.style.display = showing ? 'none' : '';
+  this.textContent = showing ? t('tpl_toggle') : t('tpl_hide');
+  if(!showing) renderTplEditor();
+});
+
+function renderTplEditor(){
+  const tpls = getMedTemplates();
+  const list = $('#tpl_list');
+  list.innerHTML = tpls.map(function(m, i){
+    const name = t('med_'+m.id) === 'med_'+m.id ? esc(m.name) : esc(t('med_'+m.id));
+    const flds = m.fields.map(function(f){ return t('field_'+f) === 'field_'+f ? f : t('field_'+f); }).join(', ');
+    const mgNote = m.mgPerTab ? ' · ' + m.mgPerTab + 'mg/tab' : '';
+    const multiNote = m.multi ? ' · multi' : '';
+    return '<div class="tpl-item"><span><span class="tpl-name">' + name + '</span><span class="tpl-fields">' + esc(flds) + mgNote + multiNote + '</span></span>'
+      + '<button type="button" class="btn-rm-tpl" onclick="removeTemplate(' + i + ')" title="Remove">&times;</button></div>';
+  }).join('');
+  list.innerHTML += '<button type="button" class="btn-reset-tpl" onclick="resetTemplates()" data-i18n="tpl_reset">' + t('tpl_reset') + '</button>';
+  // Render field chips
+  const chips = $('#tpl_field_chips');
+  chips.innerHTML = _ALL_MED_FIELDS.map(function(f){
+    const label = t('field_'+f) === 'field_'+f ? f : t('field_'+f);
+    return '<div class="chip" data-field="' + f + '" onclick="this.classList.toggle(\'on\')">' + esc(label) + '</div>';
+  }).join('');
+}
+
+function addCustomTemplate(){
+  const nameInput = $('#tpl_new_name');
+  const name = nameInput.value.trim();
+  if(!name){ toast(t('tpl_name_required')); return; }
+  const selectedFields = [];
+  $$('#tpl_field_chips .chip.on').forEach(function(c){ selectedFields.push(c.dataset.field); });
+  if(!selectedFields.length){ toast(t('tpl_fields_required')); return; }
+  const id = 'custom_' + Math.random().toString(36).slice(2,8);
+  const mgVal = parseFloat($('#tpl_new_mg').value);
+  const multi = $('#tpl_new_multi').value === 'true';
+  const tpl = { id: id, name: name, fields: selectedFields, multi: multi, custom: true };
+  if(mgVal > 0) tpl.mgPerTab = mgVal;
+  const tpls = getMedTemplates().slice();
+  tpls.push(tpl);
+  saveMedTemplates(tpls);
+  // Clear form
+  nameInput.value = '';
+  $('#tpl_new_mg').value = '';
+  $('#tpl_new_multi').value = 'false';
+  $$('#tpl_field_chips .chip.on').forEach(function(c){ c.classList.remove('on'); });
+  $$('.tpl-add .tyn.on').forEach(function(b){ b.classList.remove('on'); });
+  renderTplEditor();
+  initMedSelector();
+  toast(t('tpl_added'));
+}
+
+function removeTemplate(idx){
+  const tpls = getMedTemplates().slice();
+  if(idx < 0 || idx >= tpls.length) return;
+  tpls.splice(idx, 1);
+  if(tpls.length) saveMedTemplates(tpls);
+  else localStorage.removeItem(_MED_TPL_KEY);
+  renderTplEditor();
+  initMedSelector();
+}
+
+function resetTemplates(){
+  localStorage.removeItem(_MED_TPL_KEY);
+  renderTplEditor();
+  initMedSelector();
+  toast(t('tpl_reset_done'));
+}
 
 function medLineHTML(m){ return medLineDisplay(m); }
 
@@ -1285,7 +2535,74 @@ function editFromLog(date, coll){
   else if(coll==='assess') loadAssess(date);
   else if(coll==='meds') loadMeds(date);
   switchSeg(coll);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   toast(`${t('toast_editing')} ${t('tab_'+coll)} · ${fmtDate(date)}`);
+}
+
+const _LOG_PAGE = 50;
+let _logLimit = _LOG_PAGE;
+
+function _renderDateHTML(date, e){
+  const medEntries = e.meds ? _activeEntries(e.meds.entries) : [];
+  const tags=[];
+  if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
+  if(e.assess) tags.push(`PHQ ${e.assess.phq9_total ?? 0} · GAD ${e.assess.gad7_total ?? 0}`);
+  if(medEntries.length)
+    tags.push(`${medEntries.length} ${t('log_med_entries')}`);
+  const valTag = tags.join(' · ') || '—';
+  let body='<dl>';
+  if(e.daily){
+    const d=_repairDailyShift(e.daily);
+    const vlog = Array.isArray(d.valence_log) ? d.valence_log : [];
+    if(vlog.length > 1){
+      const readings = vlog
+        .filter(function(r){ return r && typeof r.v === 'number'; })
+        .map(function(r){ return esc(r.at) + ' ' + esc(t(valWord(r.v*100))) + ' (' + r.v.toFixed(2) + ')'; }).join(' → ');
+      if(readings) body+=`<dt>${t('log_mood')}</dt><dd>${readings}</dd>`;
+    } else if(typeof d.valence === 'number'){
+      body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
+    }
+    const bsens = _asArr(d.body_sensations);
+    if(bsens.length){
+      const bodyTxt = bsens.map(s=>esc(t(s))).join(', ')
+        + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
+        + (d.body_other ? ` · ${esc(d.body_other)}` : '');
+      body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
+    }
+    if(d.sleep_bedtime || d.sleep_wake_time){
+      let sleepTxt = '';
+      if(d.sleep_bedtime) sleepTxt += `bed ${esc(extractTime(d.sleep_bedtime))}`;
+      if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
+      if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
+      if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
+      if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+normSQ(d.sleep_quality)))}`;
+      body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
+    }
+    if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
+    if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
+  }
+  if(e.assess){
+    const a=e.assess;
+    const inc = ' · ' + t('log_incomplete');
+    const pt = typeof a.phq9_total === 'number' ? a.phq9_total : 0;
+    const gt = typeof a.gad7_total === 'number' ? a.gad7_total : 0;
+    body+=`<dt>PHQ-9</dt><dd>${pt} (${esc(t(phqSeverity(pt)))})${a.phq9_complete?'':inc}</dd>`;
+    body+=`<dt>GAD-7</dt><dd>${gt} (${esc(t(gadSeverity(gt)))})${a.gad7_complete?'':inc}</dd>`;
+    if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
+  }
+  if(medEntries.length){
+    const lines = medEntries.map(medLineHTML).join('<br>');
+    body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
+  }
+  body+='</dl>';
+  const edits=[];
+  if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
+  if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
+  if(medEntries.length)
+    edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
+  const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
+  const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
+  return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${esc(valTag)}</span></summary><div class="log-body">${body}${editRow}</div></details>`;
 }
 
 function renderLog(){
@@ -1300,73 +2617,54 @@ function renderLog(){
   const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
   const list=$('#logList');
   if(!dates.length){ list.innerHTML=`<div class="empty">${esc(t('log_empty'))}</div>`; return; }
-  list.innerHTML = dates.map(date=>{
-    const e=byDate[date];
-    const tags=[];
-    if(e.daily && typeof e.daily.valence==='number') tags.push(`${t('log_valence')} ${e.daily.valence.toFixed(2)}`);
-    if(e.assess) tags.push(`PHQ ${e.assess.phq9_total} · GAD ${e.assess.gad7_total}`);
-    if(e.meds && e.meds.entries && e.meds.entries.length)
-      tags.push(`${e.meds.entries.length} ${t('log_med_entries')}`);
-    const valTag = tags.join(' · ') || '—';
-    let body='<dl>';
-    if(e.daily){
-      const d=e.daily;
-      body+=`<dt>${t('log_mood')}</dt><dd>${esc(t(valWord(d.valence*100)))} (${d.valence.toFixed(2)})</dd>`;
-      if(d.body_sensations&&d.body_sensations.length){
-        const bodyTxt = d.body_sensations.map(s=>esc(t(s))).join(', ')
-          + (d.body_tension_where ? ` · ${esc(t('Tension'))}: ${esc(d.body_tension_where)}` : '')
-          + (d.body_other ? ` · ${esc(d.body_other)}` : '');
-        body+=`<dt>${t('log_body')}</dt><dd>${bodyTxt}</dd>`;
-      }
-      if(d.sleep_bedtime || d.sleep_wake_time){
-        let sleepTxt = '';
-        if(d.sleep_bedtime) sleepTxt += `bed ${esc(extractTime(d.sleep_bedtime))}`;
-        if(d.sleep_onset) sleepTxt += ` → onset ~${esc(extractTime(d.sleep_onset))}`;
-        if(d.sleep_wakes !== null && d.sleep_wakes !== undefined) sleepTxt += ` · wakes: ${d.sleep_wakes}`;
-        if(d.sleep_wake_time) sleepTxt += ` · up ${esc(extractTime(d.sleep_wake_time))}`;
-        if(d.sleep_quality) sleepTxt += ` · ${esc(t('sq_'+d.sleep_quality))}`;
-        body+=`<dt>${t('log_sleep')}</dt><dd>${sleepTxt.trim()}</dd>`;
-      }
-      if(d.biological_fact) body+=`<dt>${t('log_bio')}</dt><dd>${esc(d.biological_fact)}</dd>`;
-      if(d.note) body+=`<dt>${t('log_note')}</dt><dd>${esc(d.note)}</dd>`;
+  const visible = dates.slice(0, _logLimit);
+  const remaining = dates.length - visible.length;
+  let html = visible.map(function(date){
+    try { return _renderDateHTML(date, byDate[date]); }
+    catch(err){
+      console.error('[PPT] log render failed for ' + date, err);
+      return '<details class="log-entry"><summary><span class="ld">' + fmtDate(date) + '</span><span class="lv">⚠</span></summary><div class="log-body" style="padding:12px;">' + (currentLang === 'zh' ? '此筆紀錄無法顯示。' : 'Could not render this entry.') + '</div></details>';
     }
-    if(e.assess){
-      const a=e.assess;
-      const inc = ' · ' + t('log_incomplete');
-      body+=`<dt>PHQ-9</dt><dd>${a.phq9_total} (${esc(t(phqSeverity(a.phq9_total)))})${a.phq9_complete?'':inc}</dd>`;
-      body+=`<dt>GAD-7</dt><dd>${a.gad7_total} (${esc(t(gadSeverity(a.gad7_total)))})${a.gad7_complete?'':inc}</dd>`;
-      if(a.functional_difficulty) body+=`<dt>${t('log_difficulty')}</dt><dd>${esc(tStored(a.functional_difficulty))}</dd>`;
-    }
-    if(e.meds && e.meds.entries.length){
-      const lines = e.meds.entries.map(medLineHTML).join('<br>');
-      body+=`<dt>${t('log_meds')}</dt><dd>${lines}</dd>`;
-    }
-    body+='</dl>';
-    const edits=[];
-    if(e.daily) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="daily">${t('log_edit_daily')}</button>`);
-    if(e.assess) edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="assess">${t('log_edit_assess')}</button>`);
-    if(e.meds && e.meds.entries && e.meds.entries.length)
-      edits.push(`<button type="button" class="btn-log-edit" data-date="${date}" data-coll="meds">${t('log_edit_meds')}</button>`);
-    const editRow = edits.length ? `<div class="log-edit">${edits.join('')}</div>` : '';
-    const bf = (e.daily&&e.daily.backfilled)||(e.meds&&e.meds.backfilled) ? ' · '+t('log_backfilled') : '';
-    return `<details class="log-entry"><summary><span class="ld">${fmtDate(date)}${bf}</span><span class="lv">${esc(valTag)}</span></summary><div class="log-body">${body}${editRow}</div></details>`;
   }).join('');
+  if(remaining > 0){
+    html += `<button type="button" id="logShowMore" class="btn-ghost" style="width:100%;margin-top:12px;padding:10px;font-size:12px;letter-spacing:0.05em;">${t('log_show_more', { n: remaining })}</button>`;
+  }
+  list.innerHTML = html;
 }
 $('#logList').addEventListener('click', e=>{
+  if(e.target.id === 'logShowMore'){
+    _logLimit += _LOG_PAGE;
+    renderLog();
+    return;
+  }
   const btn = e.target.closest('.btn-log-edit');
   if(!btn) return;
   editFromLog(btn.dataset.date, btn.dataset.coll);
 });
 
+// Guard against the silent-empty-export footgun: warn if there's nothing to export, or if
+// cloud data is still loading — so a good backup can't be quietly overwritten by an empty
+// file exported before hydration finished. Returns false to cancel the export.
+function _exportGuard(){
+  const d = Store._all();
+  const total = d.daily.length + d.assess.length + d.meds.length;
+  if(typeof _hydrating !== 'undefined' && _hydrating)
+    return confirm(currentLang==='zh' ? '資料仍在從雲端載入中，現在匯出可能不完整。仍要匯出嗎？' : 'Data is still loading from the cloud — exporting now may be incomplete. Export anyway?');
+  if(total === 0)
+    return confirm(currentLang==='zh' ? '沒有可匯出的資料（可能尚未載入或已登出）。仍要匯出空檔案嗎？' : 'No entries to export — data may not have loaded yet, or you may be signed out. Export an empty file anyway?');
+  return true;
+}
 function exportJSON(){
+  if(!_exportGuard()) return;
   const blob=new Blob([JSON.stringify(Store.exportClean(),null,2)],{type:'application/json'});
   dl(blob, `monitor_export_${todayISO()}.json`);
 }
 function exportCSV(){
+  if(!_exportGuard()) return;
   const all=Store.exportClean(); const rows=[['collection','entry_date','submission_id','field','value']];
   ['daily','assess','meds'].forEach(coll=>all[coll].forEach(r=>{
     Object.entries(r).forEach(([k,v])=>{
-      if(['entry_date','submission_id'].includes(k))return;
+      if(k === 'entry_date' || k === 'submission_id' || k.charAt(0) === '_')return;
       rows.push([coll, r.entry_date, r.submission_id, k, typeof v==='object'?JSON.stringify(v):v]);
     });
   }));
@@ -1375,27 +2673,338 @@ function exportCSV(){
 }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
 
-$('#brandBtn').addEventListener('click', ()=>{
-  const url = prompt('Enter Google Apps Script Sync URL:');
-  if(url) localStorage.setItem('monitor_endpoint', url.trim());
-  updateSyncUI();
-  Store.hydrateFromCloud();
-  Store.syncQueue();
-});
+function _validateRecord(coll, r) {
+  if (!r || typeof r !== 'object') return false;
+  if (typeof r.submission_id !== 'string' || !r.submission_id) return false;
+  if (r.entry_date && !/^\d{4}-\d{2}-\d{2}$/.test(Store._normalizeDate(r.entry_date))) return false;
+  if (r._field_ts !== undefined && (typeof r._field_ts !== 'object' || Array.isArray(r._field_ts))) return false;
+  if (coll === 'daily') {
+    if (r.valence !== undefined && typeof r.valence !== 'number') return false;
+    if (r.valence_log !== undefined && !Array.isArray(r.valence_log)) return false;
+    if (r.body_sensations !== undefined && !Array.isArray(r.body_sensations)) return false;
+  } else if (coll === 'assess') {
+    if (r.phq9_items !== undefined && !Array.isArray(r.phq9_items)) return false;
+    if (r.gad7_items !== undefined && !Array.isArray(r.gad7_items)) return false;
+    if (r.phq9_total !== undefined && typeof r.phq9_total !== 'number') return false;
+    if (r.gad7_total !== undefined && typeof r.gad7_total !== 'number') return false;
+  } else if (coll === 'meds') {
+    if (r.entries !== undefined && !Array.isArray(r.entries)) return false;
+  }
+  return true;
+}
 
-window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud(); Store.syncQueue(); });
-window.addEventListener('offline', updateSyncUI);
+function importJSON(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = JSON.parse(e.target.result);
+      if(!data || typeof data !== 'object'){ toast(t('toast_import_invalid')); return; }
+      // Handle versioned and unversioned exports
+      const version = data.version || 0;
+      if (version > 1) { toast(t('toast_import_version')); return; }
+      const colls = ['daily','assess','meds'];
+      const hasAny = colls.some(c => Array.isArray(data[c]) && data[c].length > 0);
+      if(!hasAny){ toast(t('toast_import_invalid')); return; }
 
-(async function appInit(){
-  await Store.hydrateFromCloud();
+      const local = Store._all();
+      let added = 0, skipped = 0;
+      colls.forEach(coll => {
+        if(!Array.isArray(data[coll])) return;
+        const existing = new Set(local[coll].map(r => r.submission_id));
+        data[coll].forEach(r => {
+          if (!_validateRecord(coll, r)) { skipped++; return; }
+          if(r.entry_date) r.entry_date = Store._normalizeDate(r.entry_date);
+          delete r._dirty;
+          if(!existing.has(r.submission_id)){
+            r._dirty = true;
+            local[coll].push(r);
+            added++;
+          }
+        });
+      });
+
+      Store._commit(local);
+      rebuildAssessItems();
+      loadDaily($('#d_date').value || todayISO());
+      loadAssess($('#a_date').value || todayISO());
+      loadMeds($('#m_date').value || todayISO());
+      refreshDueBanner();
+      renderLog();
+      updateSyncUI();
+      const msg = t('toast_import_done', { n: added }) + (skipped ? ' · ' + t('toast_import_skipped', { n: skipped }) : '');
+      toast(msg);
+      Store.syncQueue();
+    } catch(err) {
+      console.error('Import failed', err);
+      toast(t('toast_import_invalid'));
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function _resetViews(){
   rebuildAssessItems();
   loadDaily(todayISO());
   loadAssess(todayISO());
   loadMeds(todayISO());
   refreshDueBanner();
+  _logLimit = _LOG_PAGE;
+  renderLog();
+}
+
+$('#brandBtn').addEventListener('click', ()=>{
+  // If already connected to an endpoint, offer to disconnect
+  if(Store.endpoint){
+    if(confirm(t('confirm_disconnect_endpoint'))){
+      localStorage.removeItem('monitor_endpoint');
+      Store._commit({daily:[],assess:[],meds:[]});
+      _syncError = false;
+      updateAuthUI();
+      updateSyncUI();
+      _resetViews();
+      toast(t('toast_disconnected'));
+    }
+    return;
+  }
+  const url = prompt('Enter Google Apps Script Sync URL:');
+  if(url){
+    const trimmed = url.trim();
+    if(!/^https:\/\/.+/.test(trimmed)){ toast('URL must start with https://'); return; }
+    localStorage.setItem('monitor_endpoint', trimmed);
+  }
+  updateAuthUI();
+  updateSyncUI();
+  Store.hydrateFromCloud();
+  Store.syncQueue();
+});
+
+$('#googleSignIn').addEventListener('click', ()=>{ GoogleAuth.signIn(); });
+$('#googleSignOut').addEventListener('click', ()=>{
+  if(confirm(currentLang==='zh' ? '登出將清除此裝置上的本機資料（雲端試算表會保留）。確定要登出嗎？' : 'Sign out? This clears local data on this device — your cloud sheet is kept.')) GoogleAuth.signOut();
+});
+$('#googlePersist').addEventListener('click', ()=>{ _cyclePersistMode(); });
+
+// Tap sync indicator → diagnostic info (helps debug Safari / multi-sheet issues)
+function _agoStr(ts){
+  if(!ts) return '—';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if(s < 60) return s + 's ago';
+  if(s < 3600) return Math.round(s / 60) + 'm ago';
+  return Math.round(s / 3600) + 'h ago';
+}
+function _syncDiagnostics(){
+  const d = Store._all();
+  const total = d.daily.length + d.assess.length + d.meds.length;
+  const isGoogle = typeof GoogleAuth !== 'undefined' && GoogleAuth.isSignedIn;
+  const mode = isGoogle ? 'Google' : Store.endpoint ? 'Endpoint' : 'Local';
+  let token = '—';
+  if(isGoogle && GoogleAuth.tokenExpiry){
+    const m = Math.round((GoogleAuth.tokenExpiry - Date.now()) / 60000);
+    token = m > 0 ? ('valid ~' + m + 'm') : 'expired';
+  }
+  const flags = [];
+  if(_syncError) flags.push('syncError');
+  if(_authExpired) flags.push('authExpired');
+  if(_hydrating) flags.push('hydrating');
+  const lines = [
+    'Sync: ' + mode,
+    'Online: ' + (navigator.onLine ? 'yes' : 'no'),
+    'Sheet: ' + (SheetsSync.id || 'none'),
+    'Bound via: ' + (SheetsSync._bindSource || '—'),
+    'Email: ' + (GoogleAuth.userEmail || localStorage.getItem('monitor_auth_email') || '—'),
+    'Persist: ' + (typeof _getPersistMode === 'function' ? _getPersistMode() : '—'),
+    'Token: ' + token,
+    'Records: ' + d.daily.length + ' daily, ' + d.assess.length + ' assess, ' + d.meds.length + ' meds',
+    'Dirty: ' + Store.countDirty(),
+    'Last sync: ' + _agoStr(_lastSyncTs),
+    'Last hydrate: ' + _agoStr(_lastHydrateTs) + (_lastHydrateSource ? ' via ' + _lastHydrateSource : ''),
+    'Flags: ' + (flags.length ? flags.join(', ') : 'none'),
+    (total === 0 && isGoogle ? '\n⚠ No data loaded. If you have multiple PPT sheets in Google Drive, delete the empty duplicates and reload.' : '')
+  ];
+  return lines.join('\n');
+}
+$('#syncIndicator').addEventListener('click', function(){ alert(_syncDiagnostics()); });
+
+window.addEventListener('online', ()=>{ updateSyncUI(); Store.hydrateFromCloud().then(()=> Store.syncQueue()); });
+window.addEventListener('offline', updateSyncUI);
+
+let _gisAttempts = 0;
+function _waitForGIS(){
+  if(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2){
+    GoogleAuth.init();
+    // Attempt to restore saved token on page load
+    const restored = _restoreToken();
+    if(restored === true){
+      // Token was valid — already signed in
+      updateAuthUI();
+      return;
+    }
+    if(restored === 'refresh'){
+      // Token expired — try silent refresh
+      GoogleAuth.trySilentSignIn();
+    }
+    updateAuthUI();
+  } else if(++_gisAttempts < 25){
+    setTimeout(_waitForGIS, 200);
+  }
+}
+
+// ---- Dev self-test (run by adding ?selftest to the URL) ----
+// Asserts the data-model invariants the sync layer depends on, against an INDEPENDENT
+// golden copy. This is the gate for deriving the schema from a single source of truth:
+// if the derived values ever drift from this contract, or a record fails to round-trip
+// through (de)serialization, this fails loudly. Not part of normal app operation.
+function _runSelfTest(){
+  const GOLD = {
+    SCHEMA: {
+      daily: ['submission_id','entry_date','backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note','_field_ts'],
+      assess: ['submission_id','entry_date','phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty','_field_ts'],
+      meds: ['submission_id','entry_date','backfilled','entries','_field_ts']
+    },
+    JSON_FIELDS: { daily:['body_sensations','valence_log','_field_ts'], assess:['phq9_items','gad7_items','_field_ts'], meds:['entries','_field_ts'] },
+    NUMERIC: ['valence','sleep_wakes','phq9_total','gad7_total'],
+    BOOLEAN: ['backfilled','phq9_complete','gad7_complete'],
+    NULLABLE: ['sleep_wakes'],
+    MUTABLE: {
+      daily: ['backfilled','valence','valence_log','body_sensations','body_tension_where','body_other','sleep_bedtime','sleep_onset','sleep_wakes','sleep_wake_time','sleep_quality','biological_fact','note'],
+      assess: ['phq9_items','phq9_total','phq9_complete','gad7_items','gad7_total','gad7_complete','functional_difficulty'],
+      meds: ['backfilled','entries']
+    }
+  };
+  const results = [];
+  const eq = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  function sortDeep(x){
+    if(Array.isArray(x)) return x.slice().sort();
+    if(x && typeof x === 'object'){ const o={}; Object.keys(x).sort().forEach(function(k){ o[k]=sortDeep(x[k]); }); return o; }
+    return x;
+  }
+  function check(name, actual, expected){
+    const pass = eq(actual, expected);
+    results.push(pass ? { name, pass } : { name, pass, actual, expected });
+  }
+  // order-insensitive: these metadata lists are membership/iteration lookups, not positional
+  function checkSet(name, actual, expected){
+    const pass = eq(sortDeep(actual), sortDeep(expected));
+    results.push(pass ? { name, pass } : { name, pass, actual, expected });
+  }
+
+  // 1. Live schema metadata matches the golden contract.
+  //    SCHEMA is POSITIONAL (maps to cloud sheet columns) → order-strict.
+  //    The rest are used via .indexOf()/.forEach() → order-insensitive (set equality).
+  check('SCHEMA', SheetsSync.SCHEMA, GOLD.SCHEMA);
+  checkSet('JSON_FIELDS', SheetsSync.JSON_FIELDS, GOLD.JSON_FIELDS);
+  checkSet('NUMERIC', SheetsSync.NUMERIC, GOLD.NUMERIC);
+  checkSet('BOOLEAN', SheetsSync.BOOLEAN, GOLD.BOOLEAN);
+  checkSet('NULLABLE', SheetsSync.NULLABLE, GOLD.NULLABLE);
+  checkSet('_MUTABLE_FIELDS', _MUTABLE_FIELDS, GOLD.MUTABLE);
+
+  // 2. Structural self-consistency: _MUTABLE_FIELDS == SCHEMA minus the meta columns,
+  //    and every JSON field is present in SCHEMA.
+  const META = ['submission_id','entry_date','_field_ts'];
+  ['daily','assess','meds'].forEach(function(c){
+    const schema = SheetsSync.SCHEMA[c];
+    check('MUTABLE==SCHEMA-meta ['+c+']', _MUTABLE_FIELDS[c], schema.filter(function(k){ return META.indexOf(k) < 0; }));
+    (SheetsSync.JSON_FIELDS[c]||[]).forEach(function(f){
+      check('JSON in SCHEMA ['+c+'.'+f+']', schema.indexOf(f) >= 0, true);
+    });
+  });
+
+  // 3. Serialization round-trip (mirrors read()/write() using the LIVE metadata) — proves
+  //    the type tags (json/num/bool/nullable) are internally consistent.
+  function rowFrom(c, rec){
+    const schema = SheetsSync.SCHEMA[c], jf = SheetsSync.JSON_FIELDS[c]||[];
+    return schema.map(function(f){
+      const v = rec[f];
+      if(v === undefined || v === null) return '';
+      if(jf.indexOf(f) >= 0) return JSON.stringify(v);
+      return String(v);
+    });
+  }
+  function recFrom(c, row){
+    const schema = SheetsSync.SCHEMA[c], jf = SheetsSync.JSON_FIELDS[c]||[];
+    const obj = {};
+    schema.forEach(function(f, i){
+      let v = i < row.length ? row[i] : '';
+      if(jf.indexOf(f) >= 0 && typeof v === 'string' && v){ try{ v = JSON.parse(v); }catch(e){} }
+      else if(SheetsSync.BOOLEAN.indexOf(f) >= 0){ v = v === 'true' || v === true; }
+      else if(SheetsSync.NUMERIC.indexOf(f) >= 0){
+        if(v === '' || v === 'null') v = SheetsSync.NULLABLE.indexOf(f) >= 0 ? null : 0;
+        else { const n = Number(v); v = isNaN(n) ? v : n; }
+      }
+      else if(v === 'null'){ v = SheetsSync.NULLABLE.indexOf(f) >= 0 ? null : ''; }
+      obj[f] = v;
+    });
+    return obj;
+  }
+  const samples = {
+    daily: { submission_id:'s1', entry_date:'2026-05-28', backfilled:false, valence:0.42,
+             valence_log:[{v:0.42,at:'10:00'}], body_sensations:['Tension'], body_tension_where:'neck',
+             body_other:'', sleep_bedtime:'23:00', sleep_onset:'23:30', sleep_wakes:2,
+             sleep_wake_time:'07:00', sleep_quality:'3', biological_fact:'ate', note:'hi', _field_ts:{valence:123} },
+    assess: { submission_id:'s2', entry_date:'2026-05-26', phq9_items:[1,2,3,0,1,2,1,0,1], phq9_total:11,
+              phq9_complete:true, gad7_items:[1,1,1,1,1,1,1], gad7_total:7, gad7_complete:true,
+              functional_difficulty:'Somewhat difficult', _field_ts:{phq9_total:1} },
+    meds: { submission_id:'s3', entry_date:'2026-05-28', backfilled:false,
+            entries:[{id:'e1',medication:'zolon',tablets:'1',_ts:1}], _field_ts:{entries:1} }
+  };
+  ['daily','assess','meds'].forEach(function(c){
+    const rec = samples[c];
+    const round = recFrom(c, rowFrom(c, rec));
+    SheetsSync.SCHEMA[c].forEach(function(f){
+      check('roundtrip ['+c+'.'+f+']', round[f], rec[f] === undefined ? '' : rec[f]);
+    });
+  });
+
+  const failed = results.filter(function(r){ return !r.pass; });
+  if(failed.length) console.error('[PPT selftest] ' + failed.length + '/' + results.length + ' FAILED:', failed);
+  else console.warn('[PPT selftest] all ' + results.length + ' checks passed ✓');
+  return { pass: failed.length === 0, total: results.length, failed: failed };
+}
+
+// One-time permanent repair: un-shift any daily records still stored in the old +1 column
+// layout and write the corrected versions back through Store.put — which marks them dirty so
+// they resync to the cloud sheet under the user's own login (this code never touches the
+// sheet directly; the existing sync does, in the user's browser/session). Idempotent: only
+// shifted records are touched, and a corrected record no longer matches _isDailyShifted, so
+// subsequent runs are no-ops. Once this completes, _repairDailyShift has nothing left to fix.
+function _migrateDailyShift(){
+  try {
+    const daily = (Store.everything().daily || []).slice();
+    let fixed = 0;
+    daily.forEach(function(rec){
+      if(_isDailyShifted(rec)){ Store.put('daily', _repairDailyShift(rec)); fixed++; }
+    });
+    if(fixed){
+      console.warn('[PPT] Daily column-shift migration: corrected ' + fixed + ' record(s); resyncing under your login.');
+      loadDaily($('#d_date').value || todayISO());
+      if($('#seg-log') && $('#seg-log').classList.contains('active')) renderLog();
+      toast(currentLang === 'zh' ? ('已永久修正 ' + fixed + ' 筆每日紀錄') : ('Permanently repaired ' + fixed + ' daily record(s)'));
+    }
+  } catch(e){ console.error('[PPT] Daily shift migration failed', e); }
+}
+
+(async function appInit(){
+  if(location.search.indexOf('selftest') >= 0) _runSelfTest();
+  // Guard the initial render so a bad record can't block auth/sync bootstrap below —
+  // hydration may then pull/repair the data and re-render in place.
+  try {
+    rebuildAssessItems();
+    loadDaily(todayISO());
+    loadAssess(todayISO());
+    loadMeds(todayISO());
+    refreshDueBanner();
+    renderI18n();
+  } catch(e){ console.error('[PPT] Initial render failed — continuing to sync/auth init', e); }
+
+  await Store.hydrateFromCloud();
+  _migrateDailyShift();
   updateSyncUI();
   Store.syncQueue();
-  renderI18n();
+
+  _waitForGIS();
 })();
 </script>
 </body>
