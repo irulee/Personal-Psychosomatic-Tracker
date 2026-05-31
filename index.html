@@ -2900,6 +2900,28 @@ function _runSelfTest(){
   return { pass: failed.length === 0, total: results.length, failed: failed };
 }
 
+// One-time permanent repair: un-shift any daily records still stored in the old +1 column
+// layout and write the corrected versions back through Store.put — which marks them dirty so
+// they resync to the cloud sheet under the user's own login (this code never touches the
+// sheet directly; the existing sync does, in the user's browser/session). Idempotent: only
+// shifted records are touched, and a corrected record no longer matches _isDailyShifted, so
+// subsequent runs are no-ops. Once this completes, _repairDailyShift has nothing left to fix.
+function _migrateDailyShift(){
+  try {
+    const daily = (Store.everything().daily || []).slice();
+    let fixed = 0;
+    daily.forEach(function(rec){
+      if(_isDailyShifted(rec)){ Store.put('daily', _repairDailyShift(rec)); fixed++; }
+    });
+    if(fixed){
+      console.warn('[PPT] Daily column-shift migration: corrected ' + fixed + ' record(s); resyncing under your login.');
+      loadDaily($('#d_date').value || todayISO());
+      if($('#seg-log') && $('#seg-log').classList.contains('active')) renderLog();
+      toast(currentLang === 'zh' ? ('已永久修正 ' + fixed + ' 筆每日紀錄') : ('Permanently repaired ' + fixed + ' daily record(s)'));
+    }
+  } catch(e){ console.error('[PPT] Daily shift migration failed', e); }
+}
+
 (async function appInit(){
   if(location.search.indexOf('selftest') >= 0) _runSelfTest();
   rebuildAssessItems();
@@ -2910,6 +2932,7 @@ function _runSelfTest(){
   renderI18n();
 
   await Store.hydrateFromCloud();
+  _migrateDailyShift();
   updateSyncUI();
   Store.syncQueue();
 
